@@ -1,0 +1,953 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Điểm danh bằng khuôn mặt · Giáo viên</title>
+<style>
+:root{--bg:#f4f5f7;--card:#fff;--tx:#1d2330;--mut:#667085;--bd:#dfe3ea;--pri:#2457d6;--ok:#17803d;--okbg:#e4f5ea;--bad:#c62828;--hl:#fff3cd;--warn:#d97706;color-scheme:light}
+@media (prefers-color-scheme:dark){:root{color-scheme:dark;--bg:#12151c;--card:#1b2030;--tx:#e8ebf2;--mut:#98a2b3;--bd:#2c3347;--pri:#6b93ff;--ok:#5fd18a;--okbg:#17301f;--bad:#ff7b72;--hl:#3a3320;--warn:#fbbf24}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.app{display:grid;grid-template-columns:170px 1fr 330px;min-height:100vh}
+nav{background:var(--card);border-right:1px solid var(--bd);padding:14px 0}
+nav h1{font-size:13px;margin:0 14px 12px;color:var(--mut);font-weight:600}
+nav button{display:block;width:100%;text-align:left;border:0;background:none;color:var(--tx);padding:10px 14px;font:inherit;cursor:pointer;border-left:3px solid transparent}
+nav button.on{background:var(--bg);border-left-color:var(--pri);font-weight:600}
+nav .who{margin:14px 14px 4px;font-size:12px;color:var(--mut);border-top:1px solid var(--bd);padding-top:10px}
+main{padding:14px;min-width:0}
+aside{background:var(--card);border-left:1px solid var(--bd);padding:12px;overflow:auto;max-height:100vh}
+h2{font-size:15px;margin:0 0 8px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:12px;margin-bottom:12px}
+.scene{width:100%;border-radius:8px;display:block;background:#222;user-select:none;-webkit-user-select:none}
+.scene rect.box{fill:none;stroke:#e11d48}
+.scene rect.box.ok{stroke:#16a34a}
+.scene rect.box.hl{stroke:#f59e0b}
+.scene rect.handle{fill:#fff;stroke:#2457d6;stroke-width:1.5px;vector-effect:non-scaling-stroke}
+.scene text{font:700 13px system-ui;fill:#fff;paint-order:stroke;stroke:#000;stroke-width:3px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px}
+.stat{background:var(--bg);border-radius:8px;padding:10px 12px}
+.stat b{display:block;font-size:22px}.stat span{color:var(--mut);font-size:12px}
+.stat.pri{background:linear-gradient(135deg,var(--pri),#4b7bff);color:#fff}
+.stat.pri span{color:#dbe4ff}
+.stat.ok{background:var(--okbg)}.stat.ok b{color:var(--ok)}
+.stat.bad{background:#fde8e8}.stat.bad b{color:var(--bad)}
+.stat.warn{background:#fff4dd}.stat.warn b{color:var(--warn)}
+@media (prefers-color-scheme:dark){.stat.bad{background:#3a1f1f}.stat.warn{background:#3a3320}}
+.drop{border:2px dashed var(--bd);border-radius:8px;padding:20px;color:var(--mut);text-align:center;transition:.15s}
+.drop.over{border-color:var(--pri);background:var(--okbg)}
+button.p{background:var(--pri);color:#fff;border:0;border-radius:6px;padding:8px 12px;font:inherit;cursor:pointer}
+button.p:disabled{opacity:.4;cursor:not-allowed}
+button.g{background:none;border:1px solid var(--bd);color:var(--tx);border-radius:6px;padding:7px 10px;font:inherit;cursor:pointer}
+button.g.on{background:var(--pri);border-color:var(--pri);color:#fff}
+button.d{background:none;border:1px solid var(--bd);color:var(--bad);border-radius:6px;padding:7px 10px;font:inherit;cursor:pointer}
+button:disabled{opacity:.4;cursor:not-allowed}
+button.sm{padding:4px 8px;font-size:12px}
+.face{display:grid;grid-template-columns:64px 1fr;gap:10px;border:1px solid var(--bd);border-radius:10px;padding:8px;margin-bottom:10px;position:relative}
+.face.hl{background:var(--hl)}.face.done{background:var(--okbg)}
+.face img,.noimg{width:64px;height:64px;object-fit:cover;border-radius:8px;background:#000;cursor:zoom-in}
+.noimg{display:grid;place-items:center;color:#aaa;font-size:11px;cursor:default;text-align:center}
+.row{display:flex;gap:6px;margin-top:6px}
+.row input{flex:1;min-width:0;padding:7px 8px;border:1px solid var(--bd);border-radius:6px;background:var(--bg);color:var(--tx);font:inherit}
+.sug{position:absolute;left:82px;right:8px;background:var(--card);border:1px solid var(--bd);border-radius:6px;z-index:5;box-shadow:0 6px 18px rgba(0,0,0,.18);max-height:150px;overflow:auto}
+.sug div{padding:7px 9px;cursor:pointer}.sug div:hover{background:var(--bg)}
+.tag{font-size:12px;color:var(--mut)}
+.ok{color:var(--ok);font-weight:600}
+.bad{color:var(--bad);font-weight:600}
+.warnc{color:var(--warn);font-weight:600}
+table{width:100%;border-collapse:collapse}
+th,td{text-align:left;padding:8px;border-bottom:1px solid var(--bd)}
+th{color:var(--mut);font-weight:600;font-size:12px;text-transform:uppercase}
+tr:hover td{background:var(--bg)}
+.bar{height:8px;background:var(--bg);border-radius:4px;overflow:hidden;min-width:80px}
+.bar i{display:block;height:100%;background:var(--ok);transition:width .3s}
+.bar i.low{background:var(--warn)}.bar i.zero{background:var(--bad)}
+.wrap{overflow-x:auto}
+.hide{display:none}
+.pill{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600}
+.pill.ok{background:var(--okbg);color:var(--ok)}
+.pill.bad{background:#fde8e8;color:var(--bad)}
+.pill.warn{background:#fff4dd;color:var(--warn)}
+@media (prefers-color-scheme:dark){.pill.bad{background:#3a1f1f}.pill.warn{background:#3a3320}}
+.filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center}
+.filters input,.filters select,.edit-in{padding:7px 10px;border:1px solid var(--bd);border-radius:6px;background:var(--bg);color:var(--tx);font:inherit}
+.edit-in{width:100%}
+.zoombar{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:8px}
+.zoombar .sep{width:1px;height:22px;background:var(--bd);margin:0 4px}
+#sceneWrap{height:62vh;min-height:260px;max-height:90vh;resize:vertical;overflow:hidden;background:#222;border-radius:8px;touch-action:none}
+#sceneWrap .scene{height:100%;cursor:grab}
+#sceneWrap .scene.m-edit{cursor:default}
+#sceneWrap .scene.m-add{cursor:crosshair}
+.detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:10px}
+.detail-col{background:var(--bg);border-radius:8px;padding:10px}
+.detail-col h3{margin:0 0 8px;font-size:13px}
+.detail-col ul{margin:0;padding-left:18px}
+.detail-col li{margin:6px 0}
+.pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:10px}
+.pf{text-align:center;font-size:12px;line-height:1.3}
+.pf img,.pf .noimg{width:84px;height:84px;margin:0 auto 4px;display:block}
+.pf b{display:block}
+.pf.abs .noimg{background:var(--bg);color:var(--mut);border:1px dashed var(--bd)}
+.pf.exc .noimg{background:#fff4dd;color:var(--warn);border:1px dashed var(--warn)}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.55);display:grid;place-items:center;padding:14px;z-index:50}
+.modal.hide{display:none}
+.pill.click{cursor:pointer;border:0;font:inherit;font-size:11px;font-weight:600}
+.pill.click:hover{filter:brightness(.95);text-decoration:underline}
+.pf .xbtn{margin-top:4px}
+.mbox{max-width:940px;width:100%;max-height:92vh;overflow:auto;background:var(--card);border-radius:12px;padding:14px}
+.mhead{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px}
+.mhead h2{margin:0}
+#lightbox{z-index:60}
+#lightbox img{max-width:92vw;max-height:88vh;border-radius:8px;background:#000}
+@media (max-width:860px){.app{grid-template-columns:1fr}nav{display:flex;border:0;border-bottom:1px solid var(--bd);padding:0;overflow-x:auto}nav h1,nav .who{display:none}nav button{white-space:nowrap;border-left:0;border-bottom:3px solid transparent;width:auto}nav button.on{border-bottom-color:var(--pri)}aside{border-left:0;max-height:none}.detail-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="app">
+<nav>
+<h1>ĐIỂM DANH AI</h1>
+<button id="t1" class="on" onclick="tab(1)">📷 Điểm danh</button>
+<button id="t2" onclick="tab(2)">📊 Dashboard</button>
+<button id="t3" onclick="tab(3)">📁 Data</button>
+<div class="who" id="who">Giáo viên</div>
+<button onclick="changePw()">🔑 Đổi mật khẩu</button>
+<button onclick="logout()">🚪 Đăng xuất</button>
+</nav>
+
+<main>
+<div id="v1">
+<div class="card">
+  <div class="drop" id="drop">
+    <div>📷 Kéo thả ảnh điểm danh vào đây, hoặc</div>
+    <div style="margin-top:8px"><label class="p" style="display:inline-block;cursor:pointer;background:var(--pri);color:#fff;border-radius:6px;padding:8px 12px">
+      Chọn ảnh <input type="file" id="fileIn" accept="image/*" style="display:none">
+    </label></div>
+    <div class="tag" id="status" style="margin-top:8px"></div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Kết quả nhận diện</h2>
+  <div class="zoombar">
+    <button class="g sm" onclick="zoomBy(1.4)">＋ Phóng to</button>
+    <button class="g sm" onclick="zoomBy(1/1.4)">－ Thu nhỏ</button>
+    <button class="g sm" onclick="fitView()">⤢ Vừa khung</button>
+    <span class="sep"></span>
+    <button class="g sm on" id="mPan" onclick="setMode('pan')">✋ Xem / di chuyển ảnh</button>
+    <button class="g sm" id="mEdit" onclick="setMode('edit')">✏️ Sửa khung</button>
+    <button class="g sm" id="mAdd" onclick="setMode('add')">➕ Thêm khung</button>
+    <button class="d sm" id="mDel" onclick="deleteFace(pickId)" disabled>🗑 Xoá khung đang chọn</button>
+    <span class="tag" id="zoomInfo"></span>
+  </div>
+  <div class="tag" id="modeHint" style="margin-bottom:6px"></div>
+  <div id="sceneWrap">
+    <svg id="scene" class="scene m-pan" viewBox="0 0 640 360" preserveAspectRatio="xMidYMid meet"></svg>
+  </div>
+  <div class="tag" style="margin-top:6px">Cuộn chuột để zoom · Bấm đúp = vừa khung · Kéo góc dưới bên phải khung ảnh để đổi chiều cao. Bấm vào ảnh nhỏ bên phải để phóng to đúng khuôn mặt đó. Khung đỏ: chưa xác nhận · Khung xanh: đã xác nhận · Khung vàng: đang chọn.</div>
+</div>
+
+<div class="card">
+  <h2>Thông tin buổi điểm danh</h2>
+  <div style="margin-bottom:10px;display:flex;gap:14px;flex-wrap:wrap;align-items:center">
+    <span><label class="tag">Ngày điểm danh:</label>
+    <input type="date" id="dateIn" style="padding:7px 10px;border:1px solid var(--bd);border-radius:6px;background:var(--bg);color:var(--tx);font:inherit;margin-left:6px"></span>
+    <label><input type="checkbox" id="openChk" onchange="toggleOpen()" disabled> Cho sinh viên tự chọn mặt (mở điểm danh)</label>
+    <span class="tag" id="selfCnt"></span>
+  </div>
+  <div class="stats">
+    <div class="stat"><b id="sTotal">0</b><span>Mặt đếm được</span></div>
+    <div class="stat ok"><b id="sOk">0</b><span>Đã xác nhận có mặt</span></div>
+    <div class="stat bad"><b id="sAbs">0</b><span>Chưa xác nhận / vắng</span></div>
+    <div class="stat"><b id="sRate">0%</b><span>Tỉ lệ có mặt</span></div>
+  </div>
+  <div style="margin-top:10px">
+    <button class="p" id="save" onclick="save()" disabled>💾 Lưu buổi điểm danh</button>
+    <span id="msg" class="ok"></span>
+  </div>
+  <div class="tag" style="margin-top:6px">Sinh viên đăng nhập bằng MSSV, vào thấy ảnh này và tự chọn mặt mình. Bạn xem lại ở cột bên phải rồi bấm Lưu. Sau khi lưu, vào tab Data/Dashboard để đánh dấu "vắng có phép".</div>
+</div>
+</div>
+
+<div id="v2" class="hide">
+  <div class="card">
+    <h2>Tổng quan lớp <span class="tag" id="dClassTag"></span></h2>
+    <div class="stats" style="margin-top:8px">
+      <div class="stat pri"><b id="dStudents">0</b><span>Sinh viên</span></div>
+      <div class="stat"><b id="dSessions">0</b><span>Buổi đã điểm danh</span></div>
+      <div class="stat ok"><b id="dPresentAll">0</b><span>Tổng lượt có mặt</span></div>
+      <div class="stat bad"><b id="dAbsentAll">0</b><span>Tổng lượt vắng</span></div>
+      <div class="stat warn"><b id="dExcusedAll">0</b><span>Trong đó vắng có phép</span></div>
+      <div class="stat"><b id="dAvg">0</b><span>TB có mặt/buổi</span></div>
+      <div class="stat ok"><b id="dToday">—</b><span>Có mặt hôm nay</span></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Chi tiết theo sinh viên</h2>
+    <div class="filters">
+      <input id="dSearch" placeholder="🔍 Tìm MSSV hoặc tên..." oninput="renderDashboard()" style="flex:1;min-width:200px">
+      <select id="dSort" onchange="renderDashboard()">
+        <option value="id">Sắp xếp: MSSV</option>
+        <option value="pct_asc">Tỉ lệ thấp → cao</option>
+        <option value="pct_desc">Tỉ lệ cao → thấp</option>
+        <option value="name">Tên A→Z</option>
+      </select>
+    </div>
+    <div class="wrap">
+      <table>
+        <thead><tr><th>MSSV</th><th>Họ tên</th><th>Số buổi</th><th>Trong đó vắng có phép</th><th>Tỉ lệ</th><th></th><th></th></tr></thead>
+        <tbody id="dTbody"></tbody>
+      </table>
+    </div>
+    <div class="tag" style="margin-top:6px">Vắng gồm cả có phép và không phép. Tỉ lệ = (số buổi có mặt + 0,5 × số buổi vắng có phép) / tổng buổi (vắng có phép được nửa điểm, vắng không phép là 0). "Xem" hiện ảnh mặt của sinh viên ở từng ngày.</div>
+  </div>
+
+  <div class="card">
+    <h2>Lịch sử buổi điểm danh</h2>
+    <div class="wrap"><table>
+      <thead><tr><th>Ngày</th><th>Có mặt</th><th>Vắng</th><th>Trong đó có phép</th><th>Tỉ lệ</th><th></th></tr></thead>
+      <tbody id="dSessTbody"></tbody>
+    </table></div>
+  </div>
+</div>
+
+<div id="v3" class="hide">
+  <div class="card">
+    <h2>Quản lý điểm danh theo ngày</h2>
+    <div class="filters">
+      <input type="date" id="fDate" onchange="loadSessions()">
+      <button class="g" onclick="clearFilter()">Xoá lọc</button>
+      <span class="tag" id="fInfo"></span>
+    </div>
+    <div class="wrap"><table>
+      <thead><tr><th>Ngày</th><th>Có mặt</th><th>Vắng</th><th>Trong đó có phép</th><th>Tỉ lệ</th><th>Thao tác</th></tr></thead>
+      <tbody id="sessTbody"></tbody>
+    </table></div>
+  </div>
+
+  <div class="card hide" id="detailCard">
+    <h2 id="detailTitle">Chi tiết buổi</h2>
+    <div id="detailBody"></div>
+  </div>
+
+  <div class="card">
+    <h2>Danh sách lớp <span class="tag" id="stuCount"></span></h2>
+    <div class="filters">
+      <input id="newId" placeholder="MSSV" style="width:140px" onkeydown="if(event.key==='Enter')$('newName').focus()">
+      <input id="newName" placeholder="Họ tên" style="flex:1;min-width:180px" onkeydown="if(event.key==='Enter')addStudent()">
+      <button class="p" onclick="addStudent()">＋ Thêm sinh viên</button>
+      <span class="tag" id="stuMsg"></span>
+    </div>
+    <div class="wrap"><table>
+      <thead><tr><th>MSSV</th><th>Họ tên</th><th></th></tr></thead>
+      <tbody id="stuTbody"></tbody>
+    </table></div>
+    <div class="tag" style="margin-top:8px">Sửa chỉ đổi được họ tên. Muốn đổi MSSV thì xoá rồi thêm lại (lịch sử điểm danh của MSSV cũ sẽ mất). Tài khoản sinh viên: tên đăng nhập = MSSV, mật khẩu mặc định = MSSV; "Đặt lại MK" đưa về mặc định.</div>
+  </div>
+
+  <div class="card">
+    <h2>Import danh sách lớp (CSV)</h2>
+    <div class="tag">Hai cột, mỗi dòng một sinh viên: <code>MSSV,Họ tên</code>. Dòng tiêu đề tự bỏ qua. Import chỉ thêm mới hoặc cập nhật tên, không xoá ai và không mất lịch sử điểm danh.</div>
+    <div style="margin-top:8px">
+      <input type="file" id="csvIn" accept=".csv,text/csv">
+      <button class="p" style="margin-left:6px" onclick="importCSV()">Import</button>
+    </div>
+    <div class="tag" id="csvMsg" style="margin-top:8px"></div>
+  </div>
+</div>
+</main>
+
+<aside id="side">
+<h2>Mặt cắt ra <span class="tag" id="cnt"></span></h2>
+<div id="faces"><div class="tag">Chưa có ảnh. Thả ảnh vào để bắt đầu.</div></div>
+</aside>
+</div>
+
+<div class="modal hide" id="modal" onclick="if(event.target===this)closeModal()">
+  <div class="mbox">
+    <div class="mhead"><h2 id="mTitle"></h2><button class="g sm" onclick="closeModal()">✕ Đóng</button></div>
+    <div id="mBody"></div>
+  </div>
+</div>
+<div class="modal hide" id="lightbox" onclick="this.classList.add('hide')"><img id="lbImg" alt=""></div>
+
+<script>
+const $ = id => document.getElementById(id);
+const norm = s => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/đ/g,"d");
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+let STUDENTS = [], CLASS_CODE = "", CLASS_NAME = "";
+let IMG = null, faces = [], pickId = null;
+let V = null;          // khung nhìn: {cx, cy, w, fitted}
+let DASH = null, editIdx = null;
+let MODE = "pan", op = null, dragMoved = false, curTab = 1, lastSig = "";
+let pendingCalls = 0, saveChain = Promise.resolve(), detailCtx = null;
+const MIN = 12;
+
+function todayISO(){
+  const d = new Date();
+  return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+}
+function isoToVN(iso){
+  if(!iso) return "";
+  const [y,m,d] = iso.split("-");
+  return `${d}/${m}/${y}`;
+}
+const fmtDate = d => /^\d{4}-\d{2}-\d{2}$/.test(d) ? isoToVN(d) : d;
+const newFid = () => Array.from(crypto.getRandomValues(new Uint8Array(4))).map(b => b.toString(16).padStart(2,"0")).join("");
+$("dateIn").value = todayISO();
+
+async function api(method, url, body){
+  const r = await fetch(url, {method, headers:{"Content-Type":"application/json"},
+    body: body === undefined ? undefined : JSON.stringify(body)});
+  const j = await r.json().catch(() => ({}));
+  if(r.status === 401){ location.href = "/"; throw new Error("Hết phiên đăng nhập"); }
+  if(!r.ok) throw new Error(j.detail || r.statusText);
+  return j;
+}
+const jget = url => api("GET", url);
+
+async function logout(){ await fetch("/api/auth/logout", {method:"POST"}); location.href = "/"; }
+async function changePw(){
+  const o = prompt("Mật khẩu hiện tại:"); if(o === null) return;
+  const n = prompt("Mật khẩu mới (tối thiểu 6 ký tự):"); if(n === null) return;
+  try{ await api("POST", "/api/auth/change-password", {old_password:o, new_password:n}); alert("Đã đổi mật khẩu"); }
+  catch(e){ alert("Lỗi: " + e.message); }
+}
+
+/* hàng đợi: các thao tác ghi lên server chạy lần lượt để không lệch thứ tự */
+function queue(fn){
+  pendingCalls++;
+  saveChain = saveChain.then(fn).catch(e => { $("status").textContent = "Lỗi: " + e.message; lastSig = ""; })
+    .finally(() => { pendingCalls--; });
+  return saveChain;
+}
+
+/* ---------- Sinh viên ---------- */
+async function loadStudents(){
+  const j = await jget("/api/students");
+  STUDENTS = j.students; CLASS_CODE = j.class_code; CLASS_NAME = j.class_name;
+  $("dClassTag").textContent = `(${CLASS_CODE} · ${CLASS_NAME} · ${STUDENTS.length} SV)`;
+  faces.forEach(f => { if(f.student && !STUDENTS.some(s => s.id === f.student)){ f.student = null; f.by = null; } });
+  renderStudentTable();
+  render();
+}
+
+function renderStudentTable(){
+  $("stuCount").textContent = `(${STUDENTS.length} SV)`;
+  $("stuTbody").innerHTML = STUDENTS.map((s,i) => editIdx === i
+    ? `<tr><td>${esc(s.id)}</td>
+         <td><input class="edit-in" id="editName" value="${esc(s.name)}"
+              onkeydown="if(event.key==='Enter')saveEdit(${i});if(event.key==='Escape')cancelEdit()"></td>
+         <td style="white-space:nowrap"><button class="p sm" onclick="saveEdit(${i})">Lưu</button>
+             <button class="g sm" onclick="cancelEdit()">Huỷ</button></td></tr>`
+    : `<tr><td>${esc(s.id)}</td><td>${esc(s.name)}</td>
+         <td style="white-space:nowrap"><button class="g sm" onclick="startEdit(${i})">Sửa</button>
+             <button class="g sm" onclick="resetPw(${i})">Đặt lại MK</button>
+             <button class="d sm" onclick="delStudent(${i})">Xoá</button></td></tr>`
+  ).join("") || `<tr><td colspan="3" class="tag">Chưa có sinh viên. Hãy thêm hoặc import CSV.</td></tr>`;
+  if(editIdx !== null){ const el = $("editName"); if(el){ el.focus(); el.select(); } }
+}
+function startEdit(i){ editIdx = i; renderStudentTable(); }
+function cancelEdit(){ editIdx = null; renderStudentTable(); }
+
+async function saveEdit(i){
+  const name = $("editName").value.trim();
+  if(!name){ $("stuMsg").textContent = "Họ tên không được để trống"; return; }
+  try{
+    await api("PUT", "/api/students/" + encodeURIComponent(STUDENTS[i].id), {name});
+    editIdx = null; $("stuMsg").textContent = "✔ Đã sửa";
+    await loadStudents();
+  }catch(e){ $("stuMsg").textContent = "Lỗi: " + e.message; }
+}
+async function addStudent(){
+  const id = $("newId").value.trim(), name = $("newName").value.trim();
+  if(!id || !name){ $("stuMsg").textContent = "Nhập đủ MSSV và họ tên"; return; }
+  try{
+    await api("POST", "/api/students", {id, name});
+    $("newId").value = ""; $("newName").value = "";
+    $("stuMsg").textContent = "✔ Đã thêm " + id;
+    await loadStudents();
+    $("newId").focus();
+  }catch(e){ $("stuMsg").textContent = "Lỗi: " + e.message; }
+}
+async function delStudent(i){
+  const s = STUDENTS[i];
+  if(!confirm(`Xoá ${s.id} · ${s.name}?\nLịch sử điểm danh của sinh viên này cũng bị xoá.`)) return;
+  try{
+    await api("DELETE", "/api/students/" + encodeURIComponent(s.id));
+    editIdx = null; $("stuMsg").textContent = "✔ Đã xoá " + s.id;
+    await loadStudents();
+  }catch(e){ $("stuMsg").textContent = "Lỗi: " + e.message; }
+}
+async function resetPw(i){
+  const s = STUDENTS[i];
+  if(!confirm(`Đặt lại mật khẩu của ${s.id} về mặc định (= MSSV)?`)) return;
+  try{ await api("POST", "/api/students/" + encodeURIComponent(s.id) + "/reset-password"); $("stuMsg").textContent = "✔ Đã đặt lại mật khẩu " + s.id; }
+  catch(e){ $("stuMsg").textContent = "Lỗi: " + e.message; }
+}
+
+async function importCSV(){
+  const f = $("csvIn").files[0];
+  if(!f){ $("csvMsg").textContent = "Chưa chọn file CSV"; return; }
+  const text = (await f.text()).replace(/^﻿/, "");
+  try{
+    const j = await api("POST", "/api/import-students", {csv_text: text});
+    $("csvMsg").textContent = `✔ Đã nạp ${j.count} sinh viên (thêm mới hoặc cập nhật tên)`;
+    await loadStudents();
+  }catch(e){ $("csvMsg").textContent = "Lỗi: " + e.message; }
+}
+
+/* ---------- Roll (ảnh + khung + lựa chọn) ---------- */
+function applyClaims(claims){
+  faces.forEach(f => { const c = claims[f.fid]; f.student = c ? c.student_id : null; f.by = c ? c.claimed_by : null; });
+}
+const claimSig = (claims, open) => JSON.stringify([claims, open]);
+
+function setRoll(r){
+  IMG = {image_id:r.image_id, image_url:r.image_url, image_width:r.image_width, image_height:r.image_height, date:r.date, is_open:r.is_open};
+  faces = r.faces.map(f => ({...f, student:null, by:null}));
+  applyClaims(r.claims);
+  pickId = null; V = null; lastSig = claimSig(r.claims, r.is_open);
+  $("openChk").checked = r.is_open;
+  render();
+}
+function clearRoll(){
+  IMG = null; faces = []; pickId = null; V = null; lastSig = "";
+  $("openChk").checked = false;
+  render();
+}
+async function loadRoll(date){
+  if(!date) return;
+  try{
+    const j = await jget("/api/roll/" + date);
+    $("msg").textContent = "";
+    if(j.roll){ setRoll(j.roll); $("status").textContent = `Ngày ${fmtDate(date)}: ${faces.length} khuôn mặt`; }
+    else { clearRoll(); $("status").textContent = `Ngày ${fmtDate(date)}: chưa có ảnh`; }
+  }catch(e){ $("status").textContent = "Lỗi: " + e.message; }
+}
+$("dateIn").addEventListener("change", () => loadRoll($("dateIn").value));
+
+async function poll(){
+  if(!IMG || op || pendingCalls > 0 || document.hidden || curTab !== 1) return;
+  try{
+    const date = IMG.date;
+    const j = await jget("/api/roll/" + date);
+    if(!j.roll || !IMG || IMG.date !== date || j.roll.image_id !== IMG.image_id || pendingCalls > 0 || op) return;
+    const sig = claimSig(j.roll.claims, j.roll.is_open);
+    if(sig === lastSig) return;
+    lastSig = sig;
+    applyClaims(j.roll.claims);
+    $("openChk").checked = j.roll.is_open;
+    render();
+  }catch(e){}
+}
+setInterval(poll, 4000);
+
+async function toggleOpen(){
+  if(!IMG) return;
+  const v = $("openChk").checked;
+  try{ await api("PUT", `/api/roll/${IMG.date}/open`, {open:v}); lastSig = ""; }
+  catch(e){ $("openChk").checked = !v; $("status").textContent = "Lỗi: " + e.message; }
+}
+
+/* ---------- Upload ---------- */
+const drop = $("drop"), fileIn = $("fileIn");
+drop.addEventListener("dragover", e => { e.preventDefault(); drop.classList.add("over"); });
+drop.addEventListener("dragleave", () => drop.classList.remove("over"));
+drop.addEventListener("drop", e => {
+  e.preventDefault(); drop.classList.remove("over");
+  if (e.dataTransfer.files[0]) upload(e.dataTransfer.files[0]);
+});
+fileIn.addEventListener("change", () => {
+  if (fileIn.files[0]) upload(fileIn.files[0]);
+  fileIn.value = "";
+});
+
+async function upload(file){
+  const date = $("dateIn").value;
+  if(!date){ $("status").textContent = "Hãy chọn ngày điểm danh trước"; return; }
+  if(IMG && IMG.date === date && faces.some(f => f.student) &&
+     !confirm("Ngày này đã có ảnh và các lựa chọn khuôn mặt. Tải ảnh mới sẽ xoá hết lựa chọn của ngày này. Tiếp tục?")) return;
+  $("status").textContent = "Đang nhận diện...";
+  const fd = new FormData(); fd.append("date", date); fd.append("file", file);
+  try{
+    const r = await fetch("/api/detect", {method:"POST", body:fd});
+    if(r.status === 401){ location.href = "/"; return; }
+    if(!r.ok){ const e = await r.json().catch(()=>({})); throw new Error(e.detail || r.statusText); }
+    const j = await r.json();
+    setRoll(j.roll);
+    $("msg").textContent = "";
+    $("status").textContent = `Tìm thấy ${faces.length} khuôn mặt. Sinh viên đã có thể đăng nhập để tự chọn mặt.`;
+  }catch(err){
+    $("status").textContent = "Lỗi: " + err.message;
+  }
+}
+
+/* ---------- Zoom / kéo ảnh ---------- */
+const sc = $("scene");
+function box(){ const r = sc.getBoundingClientRect(); return {w:r.width, h:r.height, l:r.left, t:r.top}; }
+function fitW(){ const b = box(); return Math.max(IMG.image_width, IMG.image_height * (b.w/b.h)); }
+
+function fitView(){
+  if(!IMG) return;
+  V = {cx: IMG.image_width/2, cy: IMG.image_height/2, w: fitW(), fitted: true};
+  applyView();
+}
+function applyView(){
+  if(!IMG || !V) return;
+  const b = box(); if(!b.w || !b.h) return;      // đang ẩn tab
+  const a = b.w/b.h, fw = fitW();
+  V.w = Math.min(fw, Math.max(fw/30, V.w));       // 100% … 3000%
+  V.cx = Math.min(IMG.image_width,  Math.max(0, V.cx));
+  V.cy = Math.min(IMG.image_height, Math.max(0, V.cy));
+  const h = V.w / a;
+  sc.setAttribute("viewBox", `${V.cx - V.w/2} ${V.cy - h/2} ${V.w} ${h}`);
+  const upp = V.w / b.w;                          // đơn vị ảnh / 1 pixel màn hình
+  sc.querySelectorAll("text[data-i]").forEach(t => {
+    t.style.fontSize = (12*upp) + "px";
+    t.style.strokeWidth = (3*upp) + "px";
+    t.setAttribute("y", +t.dataset.y - 4*upp);
+  });
+  sc.querySelectorAll("rect.handle").forEach(h => {
+    const sz = 11*upp;
+    h.setAttribute("width", sz); h.setAttribute("height", sz);
+    h.setAttribute("x", +h.dataset.cx - sz/2); h.setAttribute("y", +h.dataset.cy - sz/2);
+  });
+  $("zoomInfo").textContent = "Zoom " + Math.round(fw/V.w*100) + "%";
+}
+function zoomAt(f, px, py){
+  if(!IMG || !V) return;
+  const fw = fitW(), nw = Math.min(fw, Math.max(fw/30, V.w/f)), k = nw/V.w;
+  V.cx = px - (px - V.cx)*k; V.cy = py - (py - V.cy)*k; V.w = nw; V.fitted = false;
+  applyView();
+}
+function zoomBy(f){ if(V) zoomAt(f, V.cx, V.cy); }
+function toImg(ev){
+  const b = box(), h = V.w / (b.w/b.h);
+  return {x: V.cx - V.w/2 + (ev.clientX - b.l)/b.w*V.w, y: V.cy - h/2 + (ev.clientY - b.t)/b.h*h};
+}
+function zoomToFace(i){
+  if(!IMG || !V) return;
+  const f = faces[i], fw = fitW();
+  pickId = i;
+  V.cx = f.x + f.w/2; V.cy = f.y + f.h/2;
+  V.w = Math.min(fw, Math.max(fw/30, f.w*8)); V.fitted = false;
+  render();
+}
+
+sc.addEventListener("wheel", e => {
+  if(!IMG || !V) return;
+  e.preventDefault();
+  const p = toImg(e);
+  zoomAt(e.deltaY < 0 ? 1.2 : 1/1.2, p.x, p.y);
+}, {passive:false});
+
+/* ---------- Chế độ sửa khung ---------- */
+const HINTS = {
+  pan: "Chế độ xem: kéo để di chuyển ảnh, bấm vào khung để chọn người.",
+  edit: "Chế độ sửa: bấm khung để chọn · kéo khung để dời · kéo 8 chấm trắng để đổi kích thước · phím Delete để xoá khung đang chọn.",
+  add: "Chế độ thêm: kéo chuột trên ảnh để vẽ một khung mới quanh khuôn mặt bị sót."
+};
+function setMode(m){
+  MODE = m;
+  [["pan","mPan"],["edit","mEdit"],["add","mAdd"]].forEach(([k,id]) => $(id).classList.toggle("on", k === m));
+  sc.setAttribute("class", "scene m-" + m);
+  $("modeHint").textContent = HINTS[m];
+  drawOverlay();
+}
+const HD = {nw:[0,0], n:[.5,0], ne:[1,0], e:[1,.5], se:[1,1], s:[.5,1], sw:[0,1], w:[0,.5]};
+const HCUR = {nw:"nwse-resize", se:"nwse-resize", ne:"nesw-resize", sw:"nesw-resize", n:"ns-resize", s:"ns-resize", e:"ew-resize", w:"ew-resize"};
+
+function startOp(o, e){ o.px = e.clientX; o.py = e.clientY; op = o; }
+
+sc.addEventListener("pointerdown", e => {
+  if(!IMG || !V || e.button !== 0) return;
+  dragMoved = false;
+  const t = e.target, p = toImg(e);
+  if(MODE === "add"){
+    const x = clamp(p.x, 0, IMG.image_width), y = clamp(p.y, 0, IMG.image_height);
+    startOp({type:"draw", x0:x, y0:y, x1:x, y1:y}, e); return;
+  }
+  if(MODE === "edit" && t.dataset && t.dataset.i !== undefined &&
+     (t.classList.contains("box") || t.classList.contains("handle"))){
+    const i = +t.dataset.i, f = faces[i];
+    if(pickId !== i){ pickId = i; render(); }
+    const orig = {x:f.x, y:f.y, w:f.w, h:f.h};
+    startOp(t.classList.contains("handle")
+      ? {type:"resize", i, hd:t.dataset.hd, orig}
+      : {type:"move", i, sx:p.x, sy:p.y, orig}, e);
+    return;
+  }
+  startOp({type:"pan", cx:V.cx, cy:V.cy}, e);
+});
+
+window.addEventListener("pointermove", e => {
+  if(!op) return;
+  const dx = e.clientX - op.px, dy = e.clientY - op.py;
+  if(!dragMoved && Math.abs(dx) + Math.abs(dy) < 4) return;
+  if(!dragMoved){ dragMoved = true; if(op.type === "pan") sc.style.cursor = "grabbing"; }
+  if(op.type === "pan"){
+    const k = V.w / box().w;
+    V.cx = op.cx - dx*k; V.cy = op.cy - dy*k; V.fitted = false;
+    applyView(); return;
+  }
+  const p = toImg(e), W = IMG.image_width, H = IMG.image_height;
+  if(op.type === "draw"){
+    op.x1 = clamp(p.x, 0, W); op.y1 = clamp(p.y, 0, H);
+  } else if(op.type === "move"){
+    const f = faces[op.i], o = op.orig;
+    f.x = clamp(o.x + p.x - op.sx, 0, W - o.w);
+    f.y = clamp(o.y + p.y - op.sy, 0, H - o.h);
+  } else if(op.type === "resize"){
+    const f = faces[op.i], o = op.orig, hd = op.hd;
+    let x0 = o.x, y0 = o.y, x1 = o.x + o.w, y1 = o.y + o.h;
+    if(hd.includes("w")) x0 = clamp(p.x, 0, W);
+    if(hd.includes("e")) x1 = clamp(p.x, 0, W);
+    if(hd.includes("n")) y0 = clamp(p.y, 0, H);
+    if(hd.includes("s")) y1 = clamp(p.y, 0, H);
+    if(x1 - x0 < MIN){ if(hd.includes("w")) x0 = x1 - MIN; else x1 = x0 + MIN; }
+    if(y1 - y0 < MIN){ if(hd.includes("n")) y0 = y1 - MIN; else y1 = y0 + MIN; }
+    f.x = x0; f.y = y0; f.w = x1 - x0; f.h = y1 - y0;
+  }
+  drawOverlay();
+});
+
+window.addEventListener("pointerup", () => {
+  const o = op; op = null; sc.style.cursor = "";
+  if(o){
+    if(o.type === "draw"){
+      const x = Math.min(o.x0, o.x1), y = Math.min(o.y0, o.y1);
+      const w = Math.abs(o.x1 - o.x0), h = Math.abs(o.y1 - o.y0);
+      if(dragMoved && w >= MIN && h >= MIN){
+        faces.push({fid:newFid(), x, y, w, h, score:1, manual:true, crop_url:"", student:null, by:null});
+        pickId = faces.length - 1;
+        setMode("edit"); render(); commitFaces();
+      } else drawOverlay();
+    } else if((o.type === "move" || o.type === "resize") && dragMoved){
+      renderSide(); commitFaces();
+    } else if(o.type === "pan" && !dragMoved && MODE === "edit" && pickId !== null){
+      pickId = null; render();
+    }
+  }
+  setTimeout(() => { dragMoved = false; }, 0);
+});
+sc.addEventListener("dblclick", fitView);
+new ResizeObserver(() => { if(IMG && V){ V.fitted ? fitView() : applyView(); } }).observe($("sceneWrap"));
+
+document.addEventListener("keydown", e => {
+  if(e.key === "Escape"){
+    if(!$("lightbox").classList.contains("hide")) $("lightbox").classList.add("hide");
+    else if(!$("modal").classList.contains("hide")) closeModal();
+    return;
+  }
+  const tg = document.activeElement ? document.activeElement.tagName : "";
+  if((e.key === "Delete" || e.key === "Backspace") && MODE === "edit" && pickId !== null &&
+     curTab === 1 && !/INPUT|TEXTAREA|SELECT/.test(tg)){
+    e.preventDefault(); deleteFace(pickId);
+  }
+});
+
+/* ghi thay đổi khung lên server (tuần tự) */
+function commitFaces(){
+  if(!IMG) return;
+  const date = IMG.date, imageId = IMG.image_id;
+  const body = {faces: faces.map(f => ({fid:f.fid, x:f.x, y:f.y, w:f.w, h:f.h}))};
+  queue(async () => {
+    const j = await api("PUT", `/api/roll/${date}/faces`, body);
+    if(IMG && IMG.date === date && IMG.image_id === imageId){
+      const m = new Map(j.roll.faces.map(f => [f.fid, f]));
+      faces.forEach(f => { const s = m.get(f.fid); if(s) f.crop_url = s.crop_url; });
+      lastSig = ""; renderSide();
+    }
+  });
+}
+function deleteFace(i){
+  if(i === null || i === undefined || !faces[i]) return;
+  const f = faces[i];
+  if(f.student){
+    const st = STUDENTS.find(x => x.id === f.student);
+    if(!confirm(`Khung #${i+1} đang gán cho ${st ? st.id + " · " + st.name : f.student}. Xoá khung sẽ bỏ gán. Tiếp tục?`)) return;
+  }
+  faces.splice(i, 1); pickId = null; render(); commitFaces();
+}
+
+/* ---------- Vẽ màn hình Điểm danh ---------- */
+function drawScene(){
+  if(!IMG){
+    sc.dataset.img = "";
+    sc.setAttribute("viewBox", "0 0 640 360");
+    sc.innerHTML = `<text x="320" y="185" text-anchor="middle" style="font:14px system-ui;fill:#999;stroke:none">Chưa có ảnh</text>`;
+    return;
+  }
+  if(sc.dataset.img !== IMG.image_id){          // ảnh mới: nạp ảnh nền một lần
+    sc.dataset.img = IMG.image_id;
+    sc.innerHTML = `<image href="${IMG.image_url}" width="${IMG.image_width}" height="${IMG.image_height}"/><g id="overlay"></g>`;
+  }
+  drawOverlay();
+}
+
+function drawOverlay(){
+  const ov = $("overlay"); if(!ov || !IMG) return;
+  const cur = MODE === "edit" ? "move" : MODE === "add" ? "crosshair" : "pointer";
+  let s = "";
+  faces.forEach((f,i) => {
+    const st = STUDENTS.find(x => x.id === f.student);
+    const cls = "box" + (f.student ? " ok" : "") + (pickId === i ? " hl" : "");
+    s += `<rect class="${cls}" data-i="${i}" style="vector-effect:non-scaling-stroke;stroke-width:${pickId===i?4:2}px;pointer-events:all;cursor:${cur}"
+            x="${f.x}" y="${f.y}" width="${f.w}" height="${f.h}" onclick="focusFace(${i})"/>`;
+    s += `<text data-i="${i}" data-y="${f.y}" x="${f.x}" y="${f.y}" style="pointer-events:none">${i+1}${st ? " · " + esc(st.id) : ""}</text>`;
+  });
+  if(MODE === "edit" && pickId !== null && faces[pickId]){
+    const f = faces[pickId];
+    for(const [k,[a,b]] of Object.entries(HD)){
+      const cx = f.x + a*f.w, cy = f.y + b*f.h;
+      s += `<rect class="handle" data-i="${pickId}" data-hd="${k}" data-cx="${cx}" data-cy="${cy}" x="${cx}" y="${cy}" width="1" height="1" style="cursor:${HCUR[k]};pointer-events:all"/>`;
+    }
+  }
+  if(op && op.type === "draw"){
+    const x = Math.min(op.x0, op.x1), y = Math.min(op.y0, op.y1);
+    s += `<rect class="box hl" x="${x}" y="${y}" width="${Math.abs(op.x1-op.x0)}" height="${Math.abs(op.y1-op.y0)}" style="stroke-dasharray:6 4;vector-effect:non-scaling-stroke;stroke-width:2px;pointer-events:none"/>`;
+  }
+  ov.innerHTML = s;
+  $("mDel").disabled = pickId === null;
+  if(V) applyView(); else fitView();
+}
+
+function renderSide(){
+  $("cnt").textContent = faces.length ? `(${faces.length})` : "";
+  $("faces").innerHTML = faces.length ? faces.map((f,i) => {
+    const st = STUDENTS.find(x => x.id === f.student);
+    const who = f.by === "student" ? "SV tự chọn" : f.by === "teacher" ? "GV gán" : "";
+    const thumb = f.crop_url
+      ? `<img src="${esc(f.crop_url)}" alt="" title="Bấm để phóng to khuôn mặt này trên ảnh" onclick="zoomToFace(${i})">`
+      : `<div class="noimg">đang lưu…</div>`;
+    return `<div class="face ${st?"done":""} ${pickId===i?"hl":""}" id="face${i}">
+      ${thumb}
+      <div>
+        <div class="tag">Mặt #${i+1} · ${f.manual ? "khung thêm tay" : "độ tin cậy " + Math.round(f.score*100) + "%"}</div>
+        ${st
+          ? `<div class="ok">${esc(st.id)} · ${esc(st.name)}</div>
+             <div class="tag">${who}</div>
+             <div class="row"><button class="g sm" onclick="clearFace(${i})">Bỏ chọn</button>
+               <button class="d sm" title="Xoá khung này" onclick="deleteFace(${i})">🗑 Xoá khung</button></div>`
+          : `<div class="row"><input id="in${i}" placeholder="Gõ MSSV hoặc tên..." autocomplete="off"
+               oninput="suggest(${i},this.value)" onfocus="suggest(${i},this.value)"
+               onblur="setTimeout(()=>hideSug(${i}),150)">
+               <button class="d sm" title="Xoá khung này (nhận diện sai)" onclick="deleteFace(${i})">🗑</button></div>
+             <div class="sug hide" id="sug${i}"></div>`}
+      </div></div>`;
+  }).join("") : `<div class="tag">Chưa có ảnh. Thả ảnh vào để bắt đầu.</div>`;
+
+  const ok = faces.filter(f => f.student).length;
+  const self = faces.filter(f => f.by === "student").length;
+  const total = STUDENTS.length;
+  $("sTotal").textContent = faces.length;
+  $("sOk").textContent = ok;
+  $("sAbs").textContent = Math.max(0, total - ok);
+  $("sRate").textContent = (total ? Math.round(ok/total*100) : 0) + "%";
+  $("selfCnt").textContent = IMG ? `Sinh viên tự chọn: ${self} · GV gán: ${ok - self}` : "";
+  $("openChk").disabled = !IMG;
+  $("save").disabled = ok === 0;
+}
+
+function render(){
+  drawScene();
+  renderSide();
+}
+
+function focusFace(i){
+  if(dragMoved || MODE !== "pan") return;        // vừa kéo, hoặc đang ở chế độ sửa/thêm
+  pickId = i; render();
+  const el = $("face"+i);
+  if(el) el.scrollIntoView({block:"nearest", behavior:"smooth"});
+  const inp = $("in"+i); if(inp) inp.focus();
+}
+function suggest(i, q){
+  const bx = $("sug"+i); if(!bx) return;
+  q = norm(q.trim());
+  const used = new Set(faces.map(f => f.student).filter(Boolean));
+  const list = STUDENTS.filter(s => !used.has(s.id) && (!q || norm(s.id+" "+s.name).includes(q))).slice(0,8);
+  bx.innerHTML = list.length
+    ? list.map(s => `<div onmousedown="pick(${i},${STUDENTS.indexOf(s)})">${esc(s.id)} · ${esc(s.name)}</div>`).join("")
+    : `<div class="tag">Không có kết quả</div>`;
+  bx.classList.remove("hide");
+}
+function hideSug(i){ const b = $("sug"+i); if(b) b.classList.add("hide"); }
+
+function sendClaim(fid, sid){
+  const date = IMG.date;
+  queue(async () => { await api("PUT", `/api/roll/${date}/claim`, {fid, student_id:sid}); lastSig = ""; });
+}
+function pick(i, idx){
+  const f = faces[i], s = STUDENTS[idx];
+  faces.forEach(g => { if(g.student === s.id){ g.student = null; g.by = null; } });
+  f.student = s.id; f.by = "teacher"; pickId = null; render();
+  sendClaim(f.fid, s.id);
+}
+function clearFace(i){
+  const f = faces[i]; f.student = null; f.by = null; render();
+  sendClaim(f.fid, null);
+}
+
+async function save(){
+  const date = $("dateIn").value;
+  if(!date){ $("msg").textContent = "Chưa chọn ngày"; return; }
+  await saveChain;                                // đợi các thay đổi đang gửi
+  try{
+    const j = await api("POST", "/api/save", {date});
+    $("msg").textContent = `✔ Đã lưu ${j.present_count} sinh viên có mặt`;
+  }catch(err){ $("msg").textContent = "Lỗi: " + err.message; }
+}
+
+/* ---------- Tabs ---------- */
+function tab(n){
+  curTab = n;
+  [1,2,3].forEach(i => {
+    $("v"+i).classList.toggle("hide", i !== n);
+    $("t"+i).classList.toggle("on", i === n);
+  });
+  $("side").classList.toggle("hide", n !== 1);
+  document.querySelector(".app").style.gridTemplateColumns =
+    (n !== 1 && innerWidth > 860) ? "170px 1fr" : "";
+  if(n === 1 && IMG && V){ V.fitted ? fitView() : applyView(); }
+  if(n === 2) loadDashboard();
+  if(n === 3) loadSessions();
+}
+
+/* ---------- Dashboard ---------- */
+async function loadDashboard(){
+  DASH = await jget("/api/dashboard");
+  $("dStudents").textContent = DASH.total_students;
+  $("dSessions").textContent = DASH.total_sessions;
+  $("dPresentAll").textContent = DASH.total_present_all;
+  $("dExcusedAll").textContent = DASH.total_excused_all;
+  $("dAbsentAll").textContent = DASH.total_absent_all;
+  $("dAvg").textContent = DASH.avg_present_per_session;
+  $("dToday").textContent = DASH.today_present ?? "—";
+  renderDashboard();
+}
+function renderDashboard(){
+  if(!DASH) return;
+  const q = norm($("dSearch").value.trim()), sort = $("dSort").value;
+  let rows = DASH.per_student.filter(s => !q || norm(s.id+" "+s.name).includes(q));
+  rows.sort((a,b) =>
+    sort === "pct_asc" ? a.pct - b.pct :
+    sort === "pct_desc" ? b.pct - a.pct :
+    sort === "name" ? a.name.localeCompare(b.name, "vi") :
+    a.id.localeCompare(b.id));
+  $("dTbody").innerHTML = rows.map(s => {
+    const cls = s.pct === 0 ? "zero" : s.pct < 50 ? "low" : "";
+    return `<tr><td>${esc(s.id)}</td><td>${esc(s.name)}</td><td>${s.count}/${s.total}</td>
+      <td>${s.excused ? `<span class="warnc">${s.excused}</span>` : "0"}</td>
+      <td><div class="bar"><i class="${cls}" style="width:${s.pct}%"></i></div><span class="tag">${s.pct}%</span></td>
+      <td><button class="pill click ${s.pct >= 80 ? "ok" : "bad"}" title="Bấm để xem các buổi vắng và đánh dấu có phép" onclick="openStudent('${esc(s.id)}')">${s.pct >= 80 ? "Tốt" : "Cần chú ý"}</button></td>
+      <td><button class="g sm" onclick="openStudent('${esc(s.id)}')">Xem</button></td></tr>`;
+  }).join("") || `<tr><td colspan="7" class="tag">Không có dữ liệu</td></tr>`;
+
+  $("dSessTbody").innerHTML = [...DASH.sessions_summary].reverse().map(s =>
+    `<tr><td>${fmtDate(s.date)}</td><td class="ok">${s.present}</td><td class="bad">${s.absent}</td><td class="warnc">${s.excused}</td><td>${s.pct}%</td>
+     <td><button class="g sm" onclick="openDetail('${esc(s.date)}', true)">Xem</button></td></tr>`
+  ).join("") || `<tr><td colspan="6" class="tag">Chưa có buổi nào</td></tr>`;
+}
+
+/* ---------- Modal / ảnh phóng to ---------- */
+function openModal(title, html){
+  $("mTitle").textContent = title; $("mBody").innerHTML = html;
+  $("modal").classList.remove("hide");
+}
+function closeModal(){ $("modal").classList.add("hide"); detailCtx = detailCtx && !detailCtx.inModal ? detailCtx : null; }
+function showImg(url){ if(!url) return; $("lbImg").src = url; $("lightbox").classList.remove("hide"); }
+
+const faceImg = url => url
+  ? `<img src="${esc(url)}" alt="" onclick="showImg('${esc(url)}')">`
+  : `<div class="noimg">Không có ảnh</div>`;
+
+async function openStudent(sid){
+  try{
+    const j = await jget(`/api/students/${encodeURIComponent(sid)}/history`);
+    const cards = j.history.map(h => {
+      if(h.status === "present") return `<div class="pf">${faceImg(h.crop_url)}<b>${fmtDate(h.date)}</b><span class="ok">Có mặt</span>
+        <span class="tag">${h.claimed_by === "student" ? "SV tự chọn" : h.claimed_by === "teacher" ? "GV gán" : ""}</span></div>`;
+      if(h.status === "excused") return `<div class="pf exc"><div class="noimg">Vắng<br>có phép</div><b>${fmtDate(h.date)}</b><span class="warnc">Có phép</span>
+        <button class="g sm xbtn" onclick="toggleExcusedStu('${esc(h.date)}','${esc(j.student.id)}',false)">Bỏ phép</button></div>`;
+      return `<div class="pf abs"><div class="noimg">Vắng</div><b>${fmtDate(h.date)}</b><span class="bad">Không phép</span>
+        <button class="g sm xbtn" onclick="toggleExcusedStu('${esc(h.date)}','${esc(j.student.id)}',true)">Có phép</button></div>`;
+    }).join("") || `<div class="tag">Chưa có buổi điểm danh nào.</div>`;
+    openModal(`${j.student.id} · ${j.student.name}`,
+      `<div class="tag" style="margin-bottom:8px">Ảnh mặt của sinh viên ở từng ngày. Bấm vào ảnh để phóng to. Buổi vắng có nút <b>Có phép</b> để đánh dấu vắng có phép.</div><div class="pgrid">${cards}</div>`);
+  }catch(e){ alert("Lỗi: " + e.message); }
+}
+
+/* ---------- Tab Data ---------- */
+async function loadSessions(){
+  const d = await jget("/api/dashboard");
+  const f = $("fDate").value;
+  let rows = [...d.sessions_summary].reverse();
+  if(f) rows = rows.filter(s => s.date === f);
+  $("fInfo").textContent = `${rows.length} buổi`;
+  $("sessTbody").innerHTML = rows.map(s =>
+    `<tr><td>${fmtDate(s.date)}</td><td class="ok">${s.present}</td><td class="bad">${s.absent}</td><td class="warnc">${s.excused}</td><td>${s.pct}%</td>
+     <td style="white-space:nowrap"><button class="g sm" onclick="openDetail('${esc(s.date)}', false)">Xem</button>
+         <button class="d sm" onclick="delSession('${esc(s.date)}')">Xoá</button></td></tr>`
+  ).join("") || `<tr><td colspan="6" class="tag">Chưa có buổi nào</td></tr>`;
+  renderStudentTable();
+}
+function clearFilter(){ $("fDate").value = ""; loadSessions(); }
+
+function detailHTML(d){
+  const pres = d.present.map(s => `<div class="pf">${faceImg(s.crop_url)}<b>${esc(s.id)}</b>${esc(s.name)}
+      <span class="tag">${s.claimed_by === "student" ? "SV tự chọn" : s.claimed_by === "teacher" ? "GV gán" : ""}</span></div>`).join("");
+  const btn = s => `<button class="g sm" onclick="toggleExcused('${esc(d.date)}','${esc(s.id)}',${!s.excused})">${s.excused ? "Bỏ phép" : "Có phép"}</button>`;
+  const absRows = d.absent.map(s => `<li>${esc(s.id)} · ${esc(s.name)}
+      ${s.excused ? '<span class="pill warn">Có phép</span>' : '<span class="pill bad">Không phép</span>'} ${btn(s)}</li>`).join("");
+  return `<div class="detail-grid">
+    <div class="detail-col"><h3>✅ Có mặt (${d.present_count})</h3><div class="pgrid">${pres || '<span class="tag">Không có</span>'}</div></div>
+    <div class="detail-col">
+      <h3>❌ Vắng (${d.absent_count}) <span class="tag">· trong đó có phép: ${d.excused_count}</span></h3>
+      <ul>${absRows || '<li class="tag">Không có</li>'}</ul>
+    </div></div>`;
+}
+async function openDetail(date, inModal){
+  try{
+    const d = await jget("/api/sessions/" + encodeURIComponent(date));
+    detailCtx = {date, inModal};
+    const title = "Chi tiết buổi " + fmtDate(d.date);
+    if(inModal){ openModal(title, detailHTML(d)); }
+    else {
+      $("detailCard").classList.remove("hide");
+      $("detailTitle").textContent = title;
+      $("detailBody").innerHTML = detailHTML(d);
+      $("detailCard").scrollIntoView({behavior:"smooth", block:"nearest"});
+    }
+  }catch(e){ alert("Không tải được chi tiết buổi này: " + e.message); }
+}
+async function toggleExcusedStu(date, sid, excused){
+  try{
+    await api("PUT", `/api/sessions/${encodeURIComponent(date)}/excused`, {student_id:sid, excused});
+    await openStudent(sid);
+    if(curTab === 2) loadDashboard(); else if(curTab === 3) loadSessions();
+  }catch(e){ alert("Lỗi: " + e.message); }
+}
+async function toggleExcused(date, sid, excused){
+  try{
+    await api("PUT", `/api/sessions/${encodeURIComponent(date)}/excused`, {student_id:sid, excused});
+    const ctx = detailCtx;
+    if(ctx) await openDetail(ctx.date, ctx.inModal);
+    if(curTab === 2) loadDashboard(); else if(curTab === 3) loadSessions();
+  }catch(e){ alert("Lỗi: " + e.message); }
+}
+async function delSession(date){
+  if(!confirm("Xoá buổi điểm danh " + fmtDate(date) + "?")) return;
+  await api("DELETE", "/api/sessions/" + encodeURIComponent(date));
+  $("detailCard").classList.add("hide");
+  loadSessions();
+}
+
+setMode("pan");
+jget("/api/auth/me").then(m => { $("who").textContent = "Giáo viên: " + m.name; }).catch(() => {});
+loadStudents().then(() => loadRoll($("dateIn").value));
+</script>
+</body>
+</html>

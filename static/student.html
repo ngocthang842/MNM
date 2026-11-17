@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Điểm danh · Sinh viên</title>
+<style>
+:root{--bg:#f4f5f7;--card:#fff;--tx:#1d2330;--mut:#667085;--bd:#dfe3ea;--pri:#2457d6;--ok:#17803d;--okbg:#e4f5ea;--bad:#c62828;--hl:#fff3cd;color-scheme:light}
+@media (prefers-color-scheme:dark){:root{color-scheme:dark;--bg:#12151c;--card:#1b2030;--tx:#e8ebf2;--mut:#98a2b3;--bd:#2c3347;--pri:#6b93ff;--ok:#5fd18a;--okbg:#17301f;--bad:#ff7b72;--hl:#3a3320}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.top{display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:var(--card);border-bottom:1px solid var(--bd);padding:10px 14px}
+.top b{font-size:15px}.grow{flex:1}
+.layout{display:grid;grid-template-columns:1fr 330px;min-height:calc(100vh - 53px)}
+main{padding:14px;min-width:0}
+aside{background:var(--card);border-left:1px solid var(--bd);padding:12px;overflow:auto;max-height:calc(100vh - 53px)}
+h2{font-size:15px;margin:0 0 8px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:12px;margin-bottom:12px}
+.tag{font-size:12px;color:var(--mut)}
+.ok{color:var(--ok);font-weight:600}.bad{color:var(--bad);font-weight:600}
+button{font:inherit;cursor:pointer}
+button.p{background:var(--pri);color:#fff;border:0;border-radius:6px;padding:9px 14px}
+button.p:disabled{opacity:.4;cursor:not-allowed}
+button.g{background:none;border:1px solid var(--bd);color:var(--tx);border-radius:6px;padding:7px 10px}
+button.sm{padding:4px 8px;font-size:12px}
+.zoombar{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:8px}
+.scene{width:100%;border-radius:8px;display:block;background:#222;user-select:none;-webkit-user-select:none}
+#sceneWrap{height:60vh;min-height:260px;max-height:90vh;resize:vertical;overflow:hidden;background:#222;border-radius:8px;touch-action:none}
+#sceneWrap .scene{height:100%;cursor:grab}
+.scene rect.box{fill:none;stroke:#e11d48}
+.scene rect.box.tk{stroke:#9ca3af;stroke-dasharray:5 3}
+.scene rect.box.mine{stroke:#2563eb}
+.scene rect.box.hl{stroke:#f59e0b}
+.scene text{font:700 13px system-ui;fill:#fff;paint-order:stroke;stroke:#000;stroke-width:3px}
+.face{display:grid;grid-template-columns:64px 1fr;gap:10px;border:1px solid var(--bd);border-radius:10px;padding:8px;margin-bottom:10px}
+.face img{width:64px;height:64px;object-fit:cover;border-radius:8px;background:#000}
+.face.free{cursor:pointer}.face.hl{background:var(--hl)}.face.mine{background:var(--okbg)}.face.tk{opacity:.5}
+.field{display:block;margin-top:8px}
+.field span{display:block;font-size:12px;color:var(--mut);margin-bottom:3px}
+.field input{width:100%;padding:9px;border:1px solid var(--bd);border-radius:6px;background:var(--bg);color:var(--tx);font:inherit}
+.hide{display:none}
+.dateRow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
+.dateRow select{padding:6px 8px;border:1px solid var(--bd);border-radius:6px;background:var(--bg);color:var(--tx);font:inherit}
+@media (max-width:860px){.layout{grid-template-columns:1fr}aside{border-left:0;max-height:none}}
+</style>
+</head>
+<body>
+<div class="top">
+  <b>📷 Điểm danh</b>
+  <span class="tag" id="who"></span>
+  <span class="grow"></span>
+  <button class="g sm" onclick="changePw()">🔑 Đổi mật khẩu</button>
+  <button class="g sm" onclick="logout()">🚪 Đăng xuất</button>
+</div>
+<div class="layout">
+<main>
+  <div class="card">
+    <h2>Ảnh điểm danh <span class="tag" id="dateTag"></span></h2>
+    <div class="dateRow"><span class="tag">Chọn buổi:</span>
+      <select id="datePick" onchange="pickDate(this.value)"><option value="">Mới nhất</option></select>
+      <span class="tag" id="dateHint"></span></div>
+    <div class="zoombar">
+      <button class="g sm" onclick="zoomBy(1.4)">＋ Phóng to</button>
+      <button class="g sm" onclick="zoomBy(1/1.4)">－ Thu nhỏ</button>
+      <button class="g sm" onclick="fitView()">⤢ Vừa khung</button>
+      <span class="tag" id="zoomInfo"></span>
+    </div>
+    <div id="sceneWrap">
+      <svg id="scene" class="scene" viewBox="0 0 640 360" preserveAspectRatio="xMidYMid meet"></svg>
+    </div>
+    <div class="tag" style="margin-top:6px">Cuộn để zoom · Kéo để di chuyển · Bấm vào khuôn mặt của bạn (hoặc ảnh nhỏ bên phải). Khung đỏ: chưa ai chọn · Khung xám nét đứt: đã có người chọn · Khung xanh dương: của bạn.</div>
+  </div>
+  <div class="card" id="panel"></div>
+</main>
+<aside>
+  <h2>Mặt cắt ra <span class="tag" id="cnt"></span></h2>
+  <div id="faces"></div>
+</aside>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+let ME = null, R = null, selFid = null, V = null, lastSig = "", flash = null, PIN = null, datesSig = "";
+
+async function api(method, url, body){
+  const r = await fetch(url, {method, headers:{"Content-Type":"application/json"},
+    body: body === undefined ? undefined : JSON.stringify(body)});
+  const j = await r.json().catch(() => ({}));
+  if(r.status === 401){ location.href = "/"; throw new Error("Hết phiên đăng nhập"); }
+  if(!r.ok) throw new Error(j.detail || r.statusText);
+  return j;
+}
+async function logout(){ await fetch("/api/auth/logout", {method:"POST"}); location.href = "/"; }
+async function changePw(){
+  const o = prompt("Mật khẩu hiện tại:"); if(o === null) return;
+  const n = prompt("Mật khẩu mới (tối thiểu 6 ký tự):"); if(n === null) return;
+  try{ await api("POST", "/api/auth/change-password", {old_password:o, new_password:n}); alert("Đã đổi mật khẩu"); }
+  catch(e){ alert("Lỗi: " + e.message); }
+}
+
+const sigOf = r => r ? JSON.stringify([r.image_id, r.is_open, r.faces.map(f => [f.fid, f.taken, f.mine])]) : "null";
+
+const fmtD = d => d.split("-").reverse().join("/");
+async function load(){
+  const [j, d] = await Promise.all([
+    api("GET", "/api/student/roll" + (PIN ? "?date=" + encodeURIComponent(PIN) : "")),
+    api("GET", "/api/student/roll-dates")]);
+  setDates(d.dates);
+  setRoll(j.roll);
+}
+function setDates(list){
+  const sig = JSON.stringify([list, PIN]);
+  if(sig === datesSig) return;
+  datesSig = sig;
+  const sel = $("datePick");
+  sel.innerHTML = `<option value="">Mới nhất / hôm nay</option>` +
+    list.map(x => `<option value="${esc(x.date)}">${fmtD(x.date)}${x.is_open ? "" : " (đã đóng)"}</option>`).join("");
+  sel.value = PIN || "";
+  $("dateHint").textContent = PIN ? "" : "Đang tự theo buổi mới nhất";
+}
+function pickDate(v){
+  PIN = v || null; selFid = null; flash = null; lastSig = ""; datesSig = "";
+  load().catch(e => alert("Lỗi: " + e.message));
+}
+function setRoll(r){
+  const sig = sigOf(r);
+  if(sig === lastSig) return;
+  lastSig = sig;
+  const newImg = !R || !r || R.image_id !== r.image_id;
+  R = r;
+  if(newImg){ V = null; selFid = null; }
+  if(selFid && !(R && R.faces.some(f => f.fid === selFid && !f.taken))) selFid = null;
+  render();
+}
+async function poll(){ if(document.hidden) return; try{ await load(); }catch(e){} }
+
+/* ---------- Zoom / kéo ---------- */
+const sc = $("scene");
+function box(){ const r = sc.getBoundingClientRect(); return {w:r.width, h:r.height, l:r.left, t:r.top}; }
+function fitW(){ const b = box(); return Math.max(R.image_width, R.image_height * (b.w/b.h)); }
+function fitView(){ if(!R) return; V = {cx:R.image_width/2, cy:R.image_height/2, w:fitW(), fitted:true}; applyView(); }
+function applyView(){
+  if(!R || !V) return;
+  const b = box(); if(!b.w || !b.h) return;
+  const a = b.w/b.h, fw = fitW();
+  V.w = Math.min(fw, Math.max(fw/30, V.w));
+  V.cx = Math.min(R.image_width, Math.max(0, V.cx));
+  V.cy = Math.min(R.image_height, Math.max(0, V.cy));
+  const h = V.w / a;
+  sc.setAttribute("viewBox", `${V.cx - V.w/2} ${V.cy - h/2} ${V.w} ${h}`);
+  const upp = V.w / b.w;
+  sc.querySelectorAll("text[data-i]").forEach(t => {
+    t.style.fontSize = (12*upp) + "px"; t.style.strokeWidth = (3*upp) + "px";
+    t.setAttribute("y", +t.dataset.y - 4*upp);
+  });
+  $("zoomInfo").textContent = "Zoom " + Math.round(fw/V.w*100) + "%";
+}
+function zoomAt(f, px, py){
+  if(!R || !V) return;
+  const fw = fitW(), nw = Math.min(fw, Math.max(fw/30, V.w/f)), k = nw/V.w;
+  V.cx = px - (px - V.cx)*k; V.cy = py - (py - V.cy)*k; V.w = nw; V.fitted = false; applyView();
+}
+function zoomBy(f){ if(V) zoomAt(f, V.cx, V.cy); }
+function toImg(ev){
+  const b = box(), h = V.w / (b.w/b.h);
+  return {x: V.cx - V.w/2 + (ev.clientX - b.l)/b.w*V.w, y: V.cy - h/2 + (ev.clientY - b.t)/b.h*h};
+}
+function zoomToFace(fid){
+  const f = R && R.faces.find(x => x.fid === fid); if(!f || !V) return;
+  const fw = fitW();
+  V.cx = f.x + f.w/2; V.cy = f.y + f.h/2; V.w = Math.min(fw, Math.max(fw/30, f.w*8)); V.fitted = false;
+  applyView();
+}
+sc.addEventListener("wheel", e => {
+  if(!R || !V) return; e.preventDefault();
+  const p = toImg(e); zoomAt(e.deltaY < 0 ? 1.2 : 1/1.2, p.x, p.y);
+}, {passive:false});
+let drag = null, dragMoved = false;
+sc.addEventListener("pointerdown", e => {
+  if(!R || !V || e.button !== 0) return;
+  drag = {x:e.clientX, y:e.clientY, cx:V.cx, cy:V.cy}; dragMoved = false;
+});
+window.addEventListener("pointermove", e => {
+  if(!drag) return;
+  const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+  if(!dragMoved && Math.abs(dx) + Math.abs(dy) < 5) return;
+  if(!dragMoved){ dragMoved = true; sc.style.cursor = "grabbing"; }
+  const k = V.w / box().w;
+  V.cx = drag.cx - dx*k; V.cy = drag.cy - dy*k; V.fitted = false; applyView();
+});
+window.addEventListener("pointerup", () => { drag = null; sc.style.cursor = ""; setTimeout(() => { dragMoved = false; }, 0); });
+sc.addEventListener("dblclick", fitView);
+new ResizeObserver(() => { if(R && V){ V.fitted ? fitView() : applyView(); } }).observe($("sceneWrap"));
+
+/* ---------- Vẽ ---------- */
+function drawScene(){
+  if(!R){
+    sc.dataset.img = ""; sc.setAttribute("viewBox", "0 0 640 360");
+    sc.innerHTML = `<text x="320" y="185" text-anchor="middle" style="font:14px system-ui;fill:#999;stroke:none">Chưa có ảnh điểm danh</text>`;
+    return;
+  }
+  if(sc.dataset.img !== R.image_id){
+    sc.dataset.img = R.image_id;
+    sc.innerHTML = `<image href="${R.image_url}" width="${R.image_width}" height="${R.image_height}"/><g id="overlay"></g>`;
+  }
+  let s = "";
+  R.faces.forEach((f, i) => {
+    const cls = "box" + (f.mine ? " mine" : f.taken ? " tk" : "") + (selFid === f.fid ? " hl" : "");
+    const sw = selFid === f.fid || f.mine ? 4 : 2;
+    s += `<rect class="${cls}" style="vector-effect:non-scaling-stroke;stroke-width:${sw}px;pointer-events:all;cursor:pointer"
+            x="${f.x}" y="${f.y}" width="${f.w}" height="${f.h}" onclick="selectFace('${f.fid}')"/>`;
+    s += `<text data-i="${i}" data-y="${f.y}" x="${f.x}" y="${f.y}" style="pointer-events:none">${i+1}${f.mine ? " · Bạn" : ""}</text>`;
+  });
+  $("overlay").innerHTML = s;
+  if(!V) fitView(); else applyView();
+}
+
+function renderFaces(){
+  $("cnt").textContent = R && R.faces.length ? `(${R.faces.length})` : "";
+  $("faces").innerHTML = R && R.faces.length ? R.faces.map((f, i) => {
+    const cls = f.mine ? "mine" : f.taken ? "tk" : "free";
+    const st = f.mine ? `<div class="ok">✔ Mặt của bạn</div>` : f.taken ? `<div class="tag">Đã có người chọn</div>` : `<div class="tag">Bấm để chọn mặt này</div>`;
+    return `<div class="face ${cls} ${selFid===f.fid?"hl":""}" ${f.taken ? "" : `onclick="selectFace('${f.fid}')"`}>
+      <img src="${esc(f.crop_url)}" alt=""><div><div class="tag">Mặt #${i+1}</div>${st}</div></div>`;
+  }).join("") : `<div class="tag">Chưa có ảnh.</div>`;
+}
+
+function renderPanel(){
+  const keep = {id: $("fId") ? $("fId").value : "", name: $("fName") ? $("fName").value : ""};
+  const p = $("panel");
+  let html = "";
+  if(!R) html = `<div>Chưa có buổi điểm danh nào. Hãy chờ thầy/cô tải ảnh lên rồi quay lại.</div>`;
+  else {
+    const mine = R.faces.findIndex(f => f.mine);
+    if(!R.is_open) html = `<div class="bad">Buổi điểm danh đã đóng.</div>` +
+      (mine >= 0 ? `<div style="margin-top:6px" class="ok">Bạn đã điểm danh: mặt #${mine+1}.</div>` : `<div class="tag" style="margin-top:6px">Bạn chưa chọn mặt nào. Liên hệ giảng viên nếu cần.</div>`);
+    else if(selFid){
+      const idx = R.faces.findIndex(f => f.fid === selFid);
+      html = `<h2>Xác nhận mặt #${idx+1} là bạn</h2>
+        <div class="tag">Gõ đúng MSSV và họ tên của bạn để xác nhận.${mine >= 0 ? " Bạn đã chọn mặt #"+(mine+1)+"; xác nhận lại sẽ chuyển sang mặt này." : ""}</div>
+        <label class="field"><span>MSSV</span><input id="fId" autocomplete="off" inputmode="numeric"></label>
+        <label class="field"><span>Họ và tên</span><input id="fName" autocomplete="off" onkeydown="if(event.key==='Enter')confirmClaim()"></label>
+        <div style="margin-top:10px"><button class="p" onclick="confirmClaim()">✔ Đây là tôi</button>
+        <button class="g" onclick="selFid=null;render()">Huỷ</button></div>`;
+    } else if(mine >= 0){
+      html = `<div class="ok">✔ Bạn đã điểm danh: mặt #${mine+1}.</div>
+        <div class="tag" style="margin:6px 0">Nếu chọn nhầm, bấm mặt đúng của bạn để đổi, hoặc bỏ chọn.</div>
+        <button class="g" onclick="unclaim()">Bỏ chọn</button>`;
+    } else html = `<div>👉 Bấm vào <b>khuôn mặt của bạn</b> trên ảnh (hoặc ảnh nhỏ bên phải), rồi nhập MSSV và họ tên để điểm danh.</div>`;
+  }
+  html += `<div id="msg" class="${flash && flash.bad ? "bad" : "ok"}" style="margin-top:8px">${flash ? esc(flash.t) : ""}</div>`;
+  p.innerHTML = html;
+  if($("fId")){ $("fId").value = keep.id; $("fName").value = keep.name; }
+}
+
+function render(){
+  $("dateTag").textContent = R ? "· " + R.date.split("-").reverse().join("/") : "";
+  drawScene(); renderFaces(); renderPanel();
+}
+
+function selectFace(fid){
+  if(dragMoved || !R) return;
+  const f = R.faces.find(x => x.fid === fid); if(!f) return;
+  if(f.taken && !f.mine){ flash = {t:"Khuôn mặt này đã có người chọn.", bad:true}; renderPanel(); return; }
+  if(f.mine){ zoomToFace(fid); return; }
+  if(!R.is_open) return;
+  flash = null; selFid = fid; render(); zoomToFace(fid);
+  const el = $("fId"); if(el) el.focus();
+}
+
+async function confirmClaim(){
+  const id = $("fId").value.trim(), name = $("fName").value.trim();
+  if(!id || !name){ flash = {t:"Nhập đủ MSSV và họ tên.", bad:true}; renderPanel(); return; }
+  try{
+    await api("POST", "/api/student/claim", {date:R.date, fid:selFid, student_id:id, name});
+    selFid = null; flash = {t:"✔ Đã điểm danh. Thầy/cô sẽ thấy ngay."};
+  }catch(e){ flash = {t:"Lỗi: " + e.message, bad:true}; }
+  lastSig = ""; await load();
+}
+async function unclaim(){
+  try{ await api("DELETE", "/api/student/claim?date=" + R.date); flash = {t:"Đã bỏ chọn."}; }
+  catch(e){ flash = {t:"Lỗi: " + e.message, bad:true}; }
+  lastSig = ""; await load();
+}
+
+(async () => {
+  ME = await api("GET", "/api/auth/me");
+  $("who").textContent = `${ME.id} · ${ME.name}`;
+  await load();
+  setInterval(poll, 4000);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,5 @@
+.venv\Scripts\activate
+uvicorn app:app --host 0.0.0.0 --port 8001 
+link nguoidung: http://172.16.14.24:8001
+Chạy diemdanhkhuonmat
+chay ipconfig -> xem ipv4 thay mau http://172.16.112.47(:8001)
