@@ -99,6 +99,30 @@ tr:hover td{background:var(--bg)}
 .mhead h2{margin:0}
 #lightbox{z-index:60}
 #lightbox img{max-width:92vw;max-height:88vh;border-radius:8px;background:#000}
+.rag-grid{display:grid;grid-template-columns:1.45fr 1fr;gap:12px;align-items:start}
+.chat-card{display:flex;flex-direction:column;height:calc(100vh - 155px);min-height:500px;margin-bottom:0}
+.chat-log{flex:1;overflow-y:auto;padding:10px;background:var(--bg);border:1px solid var(--bd);border-radius:8px;display:flex;flex-direction:column;gap:10px}
+.msg{max-width:88%;padding:10px 12px;border-radius:10px;line-height:1.5;word-wrap:break-word}
+.msg.user{align-self:flex-end;background:var(--pri);color:#fff;border-bottom-right-radius:3px}
+.msg.bot{align-self:flex-start;background:var(--card);border:1px solid var(--bd);border-bottom-left-radius:3px}
+.msg ul{margin:6px 0;padding-left:18px}.msg li{margin:3px 0}
+.msg code{background:var(--bg);padding:1px 5px;border-radius:4px;font-size:12px}
+.msg.user code{background:rgba(255,255,255,.2);color:#fff}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+.chip{background:var(--bg);border:1px solid var(--bd);color:var(--tx);border-radius:16px;padding:5px 10px;font-size:12px;cursor:pointer;transition:.15s}
+.chip:hover{border-color:var(--pri);color:var(--pri)}
+.chat-in{display:flex;gap:8px;margin-top:8px}
+.chat-in textarea{flex:1;resize:none;height:42px;padding:9px 11px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx);font:inherit}
+.rag-meta{margin-top:7px;padding-top:6px;border-top:1px dashed var(--bd);font-size:11px;color:var(--mut);display:flex;gap:6px;flex-wrap:wrap}
+.rag-src{margin-top:6px;font-size:12px}
+.rag-src summary{cursor:pointer;color:var(--pri);font-weight:600;font-size:11.5px;user-select:none}
+.src-item{margin-top:6px;padding:7px 9px;background:var(--bg);border:1px solid var(--bd);border-radius:6px;font-size:11.5px}
+.src-item pre{margin:4px 0 0;white-space:pre-wrap;font:inherit;color:var(--mut)}
+.kb-item{border:1px solid var(--bd);border-radius:8px;padding:8px 10px;margin-top:8px;background:var(--bg)}
+.kb-head{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.field-lbl{display:block;font-size:12px;color:var(--mut);margin:8px 0 3px;font-weight:600}
+.in-full{width:100%;padding:7px 9px;border:1px solid var(--bd);border-radius:6px;background:var(--bg);color:var(--tx);font:inherit}
+@media (max-width:980px){.rag-grid{grid-template-columns:1fr}.chat-card{height:68vh}}
 @media (max-width:860px){.app{grid-template-columns:1fr}nav{display:flex;border:0;border-bottom:1px solid var(--bd);padding:0;overflow-x:auto}nav h1,nav .who{display:none}nav button{white-space:nowrap;border-left:0;border-bottom:3px solid transparent;width:auto}nav button.on{border-bottom-color:var(--pri)}aside{border-left:0;max-height:none}.detail-grid{grid-template-columns:1fr}}
 </style>
 </head>
@@ -109,6 +133,7 @@ tr:hover td{background:var(--bg)}
 <button id="t1" class="on" onclick="tab(1)">📷 Điểm danh</button>
 <button id="t2" onclick="tab(2)">📊 Dashboard</button>
 <button id="t3" onclick="tab(3)">📁 Data</button>
+<button id="t4" onclick="tab(4)">🤖 Trợ lý RAG</button>
 <div class="who" id="who">Giáo viên</div>
 <button onclick="changePw()">🔑 Đổi mật khẩu</button>
 <button onclick="logout()">🚪 Đăng xuất</button>
@@ -170,7 +195,13 @@ tr:hover td{background:var(--bg)}
 
 <div id="v2" class="hide">
   <div class="card">
-    <h2>Tổng quan lớp <span class="tag" id="dClassTag"></span></h2>
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+      <h2 style="margin:0">Tổng quan lớp <span class="tag" id="dClassTag"></span></h2>
+      <div style="display:flex;gap:6px">
+        <button class="g sm" onclick="tab(4)">🤖 Hỏi Trợ lý AI</button>
+        <button class="p sm" onclick="location.href='/api/export/attendance.csv'">📥 Xuất Excel (CSV)</button>
+      </div>
+    </div>
     <div class="stats" style="margin-top:8px">
       <div class="stat pri"><b id="dStudents">0</b><span>Sinh viên</span></div>
       <div class="stat"><b id="dSessions">0</b><span>Buổi đã điểm danh</span></div>
@@ -213,7 +244,10 @@ tr:hover td{background:var(--bg)}
 
 <div id="v3" class="hide">
   <div class="card">
-    <h2>Quản lý điểm danh theo ngày</h2>
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+      <h2 style="margin:0">Quản lý điểm danh theo ngày</h2>
+      <button class="p sm" onclick="location.href='/api/export/attendance.csv'">📥 Xuất báo cáo Excel (CSV)</button>
+    </div>
     <div class="filters">
       <input type="date" id="fDate" onchange="loadSessions()">
       <button class="g" onclick="clearFilter()">Xoá lọc</button>
@@ -253,6 +287,79 @@ tr:hover td{background:var(--bg)}
       <button class="p" style="margin-left:6px" onclick="importCSV()">Import</button>
     </div>
     <div class="tag" id="csvMsg" style="margin-top:8px"></div>
+  </div>
+</div>
+
+<div id="v4" class="hide">
+  <div class="card" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;padding:10px 14px">
+    <div>
+      <b>🤖 Trợ lý Hỏi đáp Điểm danh bằng Ngôn ngữ Tự nhiên (RAG + XLNNTN)</b>
+      <div class="tag" id="ragStatBar">Đang tải thông tin chỉ mục RAG...</div>
+    </div>
+    <button class="g sm" onclick="clearChat()">🗑 Xoá hội thoại</button>
+  </div>
+
+  <div class="rag-grid">
+    <div class="card chat-card">
+      <div class="chips">
+        <button class="chip" onclick="askChip('Hôm nay những ai vắng học?')">📅 Hôm nay ai vắng?</button>
+        <button class="chip" onclick="askChip('Sinh viên nào vắng nhiều nhất hoặc dưới 80% chuyên cần?')">⚠️ Cảnh báo &lt; 80%</button>
+        <button class="chip" onclick="askChip('Tình hình chuyên cần của Đặng Ngọc Thắng?')">👤 Hồ sơ SV05</button>
+        <button class="chip" onclick="askChip('Buổi mới nhất lớp đi học bao nhiêu người?')">📷 Buổi mới nhất</button>
+        <button class="chip" onclick="askChip('Tổng quan chuyên cần của cả lớp?')">📊 Tổng quan lớp</button>
+        <button class="chip" onclick="askChip('Cách tính tỉ lệ chuyên cần như thế nào?')">📘 Công thức chuyên cần</button>
+      </div>
+      <div class="chat-log" id="chatLog"></div>
+      <div class="chat-in">
+        <textarea id="chatInput" placeholder="Nhập câu hỏi tiếng Việt có dấu hoặc không dấu (VD: ban Thang ngay 26/11 co di hoc ko?)..."
+          onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat();}"></textarea>
+        <button class="p" id="chatSendBtn" onclick="sendChat()">Gửi ↵</button>
+      </div>
+    </div>
+
+    <div>
+      <div class="card">
+        <h2>📚 Kho tri thức bổ sung (RAG Knowledge Base)</h2>
+        <div class="tag">Nạp thêm quy chế môn học, lịch thi, thông báo lớp để Chatbot tự động phân đoạn (chunking), lập chỉ mục BM25 + TF-IDF và trả lời sinh viên.</div>
+        <label class="field-lbl">Tiêu đề tài liệu</label>
+        <input class="in-full" id="kbTitle" placeholder="VD: Quy định cấm thi & lịch báo cáo cuối kỳ">
+        <label class="field-lbl">Nội dung</label>
+        <textarea class="in-full" id="kbContent" rows="4" placeholder="Nhập quy định, lịch học bù, thang điểm chuyên cần..."></textarea>
+        <div style="margin-top:8px;display:flex;gap:8px;align-items:center">
+          <button class="p sm" onclick="addKbDoc()">＋ Nạp vào RAG</button>
+          <span class="tag" id="kbMsg"></span>
+        </div>
+        <div id="kbList" style="margin-top:8px;max-height:240px;overflow:auto"></div>
+      </div>
+
+      <div class="card">
+        <h2>⚙️ Cấu hình Mô hình Sinh (Generator)</h2>
+        <div class="tag">Mặc định chạy <b>Local XLNNTN</b> (offline 100%, không cần API key). Có thể kết nối thêm LLM để diễn đạt câu trả lời tự do hơn.</div>
+        <label class="field-lbl">Chế độ sinh câu trả lời</label>
+        <select class="in-full" id="cfgProvider" onchange="toggleCfgFields()">
+          <option value="local">Local XLNNTN (Offline · Không cần API Key)</option>
+          <option value="gemini">Google Gemini API</option>
+          <option value="openai">OpenAI / Tương thích (Groq, OpenRouter...)</option>
+          <option value="ollama">Ollama Cục bộ (Local LLM)</option>
+        </select>
+        <div id="cfgExtra" class="hide">
+          <label class="field-lbl">Tên Model (để trống = mặc định)</label>
+          <input class="in-full" id="cfgModel" placeholder="VD: gemini-2.5-flash / gpt-4o-mini / qwen2.5:3b">
+          <div id="cfgUrlWrap">
+            <label class="field-lbl">Base URL</label>
+            <input class="in-full" id="cfgBaseUrl" placeholder="VD: http://localhost:11434 hoặc https://api.openai.com/v1">
+          </div>
+          <div id="cfgKeyWrap">
+            <label class="field-lbl">API Key <span id="cfgKeyBadge" class="tag"></span></label>
+            <input class="in-full" type="password" id="cfgApiKey" placeholder="Để trống nếu giữ nguyên key đã lưu">
+          </div>
+        </div>
+        <div style="margin-top:10px;display:flex;gap:8px;align-items:center">
+          <button class="p sm" onclick="saveRagConfig()">💾 Lưu cấu hình</button>
+          <span class="tag" id="cfgMsg"></span>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 </main>
@@ -804,7 +911,7 @@ async function save(){
 /* ---------- Tabs ---------- */
 function tab(n){
   curTab = n;
-  [1,2,3].forEach(i => {
+  [1,2,3,4].forEach(i => {
     $("v"+i).classList.toggle("hide", i !== n);
     $("t"+i).classList.toggle("on", i === n);
   });
@@ -814,6 +921,7 @@ function tab(n){
   if(n === 1 && IMG && V){ V.fitted ? fitView() : applyView(); }
   if(n === 2) loadDashboard();
   if(n === 3) loadSessions();
+  if(n === 4) initRagTab();
 }
 
 /* ---------- Dashboard ---------- */
@@ -943,6 +1051,185 @@ async function delSession(date){
   await api("DELETE", "/api/sessions/" + encodeURIComponent(date));
   $("detailCard").classList.add("hide");
   loadSessions();
+}
+
+/* ---------- Tab Trợ lý AI (RAG + XLNNTN) ---------- */
+let chatHistory = [], ragInited = false;
+
+function renderMd(raw){
+  const safe = esc(raw || "");
+  const lines = safe.split("\n");
+  let out = [], inList = false;
+  for(const ln of lines){
+    const fmt = ln
+      .replace(/\*\*(.+?)\*\*/g, "<b>$1</b>")
+      .replace(/`([^`]+)`/g, "<code>$1</code>")
+      .replace(/\*(.+?)\*/g, "<i>$1</i>");
+    if(/^\s*-\s+/.test(ln)){
+      if(!inList){ out.push("<ul>"); inList = true; }
+      out.push("<li>" + fmt.replace(/^\s*-\s+/, "") + "</li>");
+    } else {
+      if(inList){ out.push("</ul>"); inList = false; }
+      if(ln.trim() === "---") out.push("<hr style='border:0;border-top:1px solid var(--bd);margin:8px 0'>");
+      else out.push(fmt ? `<div>${fmt}</div>` : "<div style='height:6px'></div>");
+    }
+  }
+  if(inList) out.push("</ul>");
+  return out.join("");
+}
+
+function appendChatMsg(role, content, extra){
+  const log = $("chatLog");
+  const div = document.createElement("div");
+  div.className = "msg " + (role === "user" ? "user" : "bot");
+  let html = role === "user" ? esc(content) : renderMd(content);
+
+  if(extra){
+    if(extra.fallback_note){
+      html += `<div class="tag warnc" style="margin-top:6px">⚠️ ${esc(extra.fallback_note)}</div>`;
+    }
+    const nlp = extra.nlp || {};
+    const stuTags = (nlp.entities_students || []).map(s => s.id).join(", ");
+    const dtTags = (nlp.entities_dates || []).map(fmtDate).join(", ");
+    html += `<div class="rag-meta">
+      <span class="pill ok">Intent: ${esc(nlp.intent || "rag")}</span>
+      ${stuTags ? `<span class="pill warn">SV: ${esc(stuTags)}</span>` : ""}
+      ${dtTags ? `<span class="pill warn">Ngày: ${esc(dtTags)}</span>` : ""}
+      <span>Engine: <b>${esc(extra.generator || "local")}</b></span>
+    </div>`;
+    if(extra.sources && extra.sources.length){
+      const items = extra.sources.map((s, idx) =>
+        `<div class="src-item">
+          <b>#${idx+1} · ${esc(s.title)}</b>
+          <span class="tag"> — Hybrid: <b>${s.score}</b> (BM25: ${s.bm25} · TF-IDF: ${s.tfidf})</span>
+          <pre>${esc(s.snippet)}</pre>
+        </div>`
+      ).join("");
+      html += `<details class="rag-src"><summary>🔍 Xem ${extra.sources.length} đoạn ngữ cảnh RAG truy xuất được</summary>${items}</details>`;
+    }
+  }
+  div.innerHTML = html;
+  log.appendChild(div);
+  log.scrollTop = log.scrollHeight;
+}
+
+function resetWelcomeChat(){
+  $("chatLog").innerHTML = "";
+  appendChatMsg("bot",
+    "Xin chào giảng viên! Tôi là **Trợ lý AI Điểm danh (Hybrid RAG + XLNNTN)**.\n" +
+    "- Tự động truy xuất dữ liệu điểm danh trực tiếp từ SQLite kết hợp kho tri thức lớp học.\n" +
+    "- Hiểu câu hỏi tiếng Việt **có dấu hoặc không dấu**, nhận diện tên sinh viên, MSSV và ngày tháng tự nhiên.\n" +
+    "- Bấm các gợi ý phía trên hoặc đặt câu hỏi bất kỳ để bắt đầu!"
+  );
+}
+
+function clearChat(){ chatHistory = []; resetWelcomeChat(); }
+function askChip(q){ $("chatInput").value = q; sendChat(); }
+
+async function sendChat(){
+  const inp = $("chatInput"), btn = $("chatSendBtn");
+  const q = inp.value.trim();
+  if(!q || btn.disabled) return;
+  inp.value = "";
+  appendChatMsg("user", q);
+  btn.disabled = true; btn.textContent = "Đang suy luận...";
+  try{
+    const res = await api("POST", "/api/rag/ask", {question: q, history: chatHistory});
+    appendChatMsg("bot", res.answer, res);
+    chatHistory.push({role:"user", content:q}, {role:"assistant", content:res.answer});
+    if(chatHistory.length > 10) chatHistory = chatHistory.slice(-10);
+  }catch(e){
+    appendChatMsg("bot", "❌ **Lỗi truy vấn RAG:** " + e.message);
+  }finally{
+    btn.disabled = false; btn.textContent = "Gửi ↵";
+    inp.focus();
+  }
+}
+
+async function loadRagStats(){
+  try{
+    const s = await jget("/api/rag/stats");
+    $("ragStatBar").textContent =
+      `Chỉ mục: ${s.total_chunks} đoạn tri thức · Từ vựng XLNNTN: ${s.vocab_size} đặc trưng · Bộ truy xuất: ${s.retriever} · Generator: ${s.provider.toUpperCase()}`;
+  }catch(e){}
+}
+
+async function loadKbDocs(){
+  try{
+    const j = await jget("/api/rag/docs");
+    const customHtml = j.custom.map(d =>
+      `<div class="kb-item">
+        <div class="kb-head"><b>📄 ${esc(d.title)}</b>
+          <button class="d sm" onclick="delKbDoc(${d.id})">Xoá</button></div>
+        <div class="tag" style="margin-top:4px;white-space:pre-wrap">${esc(d.content.slice(0, 180))}${d.content.length > 180 ? "…" : ""}</div>
+      </div>`
+    ).join("");
+    const builtinHtml = j.builtin.map(d =>
+      `<div class="kb-item" style="opacity:.8">
+        <div class="kb-head"><b>🔒 ${esc(d.title)}</b><span class="tag">Mặc định</span></div>
+      </div>`
+    ).join("");
+    $("kbList").innerHTML = customHtml + builtinHtml;
+  }catch(e){}
+}
+
+async function addKbDoc(){
+  const title = $("kbTitle").value.trim(), content = $("kbContent").value.trim();
+  if(title.length < 2 || content.length < 5){
+    $("kbMsg").textContent = "Nhập tiêu đề và nội dung tối thiểu 5 ký tự"; return;
+  }
+  try{
+    await api("POST", "/api/rag/docs", {title, content});
+    $("kbTitle").value = ""; $("kbContent").value = "";
+    $("kbMsg").textContent = "✔ Đã lập chỉ mục vào RAG";
+    await Promise.all([loadKbDocs(), loadRagStats()]);
+  }catch(e){ $("kbMsg").textContent = "Lỗi: " + e.message; }
+}
+
+async function delKbDoc(id){
+  if(!confirm("Xoá tài liệu này khỏi kho tri thức RAG?")) return;
+  try{
+    await api("DELETE", "/api/rag/docs/" + id);
+    await Promise.all([loadKbDocs(), loadRagStats()]);
+  }catch(e){ alert("Lỗi: " + e.message); }
+}
+
+function toggleCfgFields(){
+  const p = $("cfgProvider").value;
+  $("cfgExtra").classList.toggle("hide", p === "local");
+  $("cfgUrlWrap").classList.toggle("hide", p !== "openai" && p !== "ollama");
+  $("cfgKeyWrap").classList.toggle("hide", p === "ollama" || p === "local");
+}
+
+async function loadRagConfig(){
+  try{
+    const c = await jget("/api/rag/config");
+    $("cfgProvider").value = c.provider || "local";
+    $("cfgModel").value = c.model || "";
+    $("cfgBaseUrl").value = c.base_url || "";
+    $("cfgKeyBadge").textContent = c.has_saved_key ? "(đã lưu key)" : c.has_env_key ? "(dùng biến môi trường)" : "(chưa có key)";
+    toggleCfgFields();
+  }catch(e){}
+}
+
+async function saveRagConfig(){
+  const provider = $("cfgProvider").value;
+  const model = $("cfgModel").value.trim();
+  const base_url = $("cfgBaseUrl").value.trim();
+  const keyVal = $("cfgApiKey").value.trim();
+  const body = {provider, model, base_url, api_key: keyVal ? keyVal : null};
+  try{
+    await api("PUT", "/api/rag/config", body);
+    $("cfgApiKey").value = "";
+    $("cfgMsg").textContent = "✔ Đã lưu cấu hình";
+    await Promise.all([loadRagConfig(), loadRagStats()]);
+  }catch(e){ $("cfgMsg").textContent = "Lỗi: " + e.message; }
+}
+
+function initRagTab(){
+  if(!ragInited){ ragInited = true; resetWelcomeChat(); loadRagConfig(); }
+  loadRagStats();
+  loadKbDocs();
 }
 
 setMode("pan");

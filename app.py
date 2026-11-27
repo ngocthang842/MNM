@@ -13,10 +13,12 @@ import cv2
 import numpy as np
 from fastapi import (Depends, FastAPI, File, Form, HTTPException, Request,
                      Response, UploadFile)
-from fastapi.responses import FileResponse, RedirectResponse
-from pydantic import BaseModel
+from fastapi.concurrency import run_in_threadpool
+from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
+from pydantic import BaseModel, Field
 
 import db
+import rag
 from detector import get_detector
 
 BASE = Path(__file__).parent
@@ -49,12 +51,20 @@ if db.ensure_teacher(ADMIN_USER, ADMIN_PASS) and ADMIN_PASS == "admin123":
     print(f"[!] Đã tạo tài khoản giáo viên '{ADMIN_USER}' với mật khẩu mặc định 'admin123'. "
           f"Hãy đăng nhập và đổi mật khẩu ngay.")
 
-app = FastAPI(title="Điểm danh khuôn mặt")
+app = FastAPI(title="Điểm danh khuôn mặt AI + Trợ lý RAG")
 
 COOKIE = "dd_session"
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 FID_RE = re.compile(r"^[0-9a-f]{4,16}$")
 MIN_BOX = 12
+
+
+def _cleanup_uploads():
+    """Dọn các file ảnh .jpg mồ côi không còn được tham chiếu bởi bất kỳ roll hay buổi học nào."""
+    keep = db.referenced_upload_files()
+    for p in UPLOADS.glob("*.jpg"):
+        if p.name not in keep:
+            p.unlink(missing_ok=True)
 
 
 # ---------- Xác thực ----------
@@ -94,8 +104,16 @@ FAILS: dict = {}
 
 def _throttled(key):
     now = time.time()
+    # Dọn dẹp định kỳ các khoá hết hạn để tránh rò rỉ bộ nhớ
+    if len(FAILS) > 200:
+        expired = [k for k, v in FAILS.items() if not v or now - v[-1] >= 300]
+        for k in expired:
+            FAILS.pop(k, None)
     lst = [t for t in FAILS.get(key, []) if now - t < 300]
-    FAILS[key] = lst
+    if lst:
+        FAILS[key] = lst
+    else:
+        FAILS.pop(key, None)
     return len(lst) >= 8
 
 
@@ -111,15 +129,19 @@ def login(body: LoginBody, request: Request, response: Response):
     if _throttled(key):
         raise HTTPException(429, "Đăng nhập sai quá nhiều lần, thử lại sau 5 phút")
     role = None
+    canonical_user = username
     if db.verify_teacher(username, body.password):
         role = "teacher"
     elif db.verify_student(username, body.password):
         role = "student"
+        st = db.get_student(username)
+        if st:
+            canonical_user = st["id"]
     if not role:
         FAILS.setdefault(key, []).append(time.time())
         raise HTTPException(401, "Sai tài khoản hoặc mật khẩu")
     FAILS.pop(key, None)
-    tok = db.create_token(role, username)
+    tok = db.create_token(role, canonical_user)
     response.set_cookie(COOKIE, tok, httponly=True, samesite="lax", max_age=7 * 86400)
     return {"ok": True, "role": role}
 
@@ -261,7 +283,7 @@ def student_history(sid: str, u=Depends(teacher_only)):
     s = db.get_student(sid)
     if not s:
         raise HTTPException(404, "Không có sinh viên này")
-    items = db.student_history(sid, CLASS_CODE)
+    items = db.student_history(s["id"], CLASS_CODE)
     for i in items:
         i["crop_url"] = f"/uploads/{i['crop']}" if i["crop"] else None
         del i["crop"]
@@ -277,7 +299,7 @@ HEADER_WORDS = {"mssv", "id", "masv", "ma sv", "mã sv", "mã số sinh viên"}
 
 @app.post("/api/import-students")
 def import_students(body: ImportCSVBody, u=Depends(teacher_only)):
-    text = body.csv_text.lstrip("﻿")
+    text = body.csv_text.lstrip("\ufeff")
     first = next((l for l in text.splitlines() if l.strip()), "")
     delim = ";" if first.count(";") > first.count(",") else ","
     students, seen = [], set()
@@ -285,9 +307,9 @@ def import_students(body: ImportCSVBody, u=Depends(teacher_only)):
         if len(row) < 2:
             continue
         sid, name = row[0].strip(), row[1].strip()
-        if not sid or not name or sid.lower() in HEADER_WORDS or sid in seen:
+        if not sid or not name or sid.lower() in HEADER_WORDS or sid.lower() in seen:
             continue
-        seen.add(sid)
+        seen.add(sid.lower())
         students.append({"id": sid, "name": name})
     if not students:
         raise HTTPException(400, "CSV không hợp lệ hoặc rỗng")
@@ -324,17 +346,10 @@ def _need_date(d):
         raise HTTPException(400, "Ngày không hợp lệ (định dạng YYYY-MM-DD)")
 
 
-@app.post("/api/detect")
-async def detect(date: str = Form(...), file: UploadFile = File(...),
-                 u=Depends(teacher_only)):
-    _need_date(date)
-    if not file.content_type or not file.content_type.startswith("image/"):
-        raise HTTPException(400, "Chỉ nhận file ảnh")
-    raw = await file.read()
+def _detect_and_store_sync(date: str, raw: bytes):
     img = cv2.imdecode(np.frombuffer(raw, np.uint8), cv2.IMREAD_COLOR)
     if img is None:
-        raise HTTPException(400, "Không đọc được ảnh")
-
+        return None
     found = get_detector().detect(img)
     img_id = uuid.uuid4().hex[:12]
     cv2.imwrite(str(UPLOADS / f"{img_id}.jpg"), img)
@@ -355,7 +370,21 @@ async def detect(date: str = Form(...), file: UploadFile = File(...),
                       "crop": crop})
 
     db.create_roll(date, CLASS_CODE, img_id, W, H, faces)
-    return {"roll": roll_json(db.get_roll(date, CLASS_CODE))}
+    _cleanup_uploads()
+    return db.get_roll(date, CLASS_CODE)
+
+
+@app.post("/api/detect")
+async def detect(date: str = Form(...), file: UploadFile = File(...),
+                 u=Depends(teacher_only)):
+    _need_date(date)
+    if not file.content_type or not file.content_type.startswith("image/"):
+        raise HTTPException(400, "Chỉ nhận file ảnh")
+    raw = await file.read()
+    roll = await run_in_threadpool(_detect_and_store_sync, date, raw)
+    if roll is None:
+        raise HTTPException(400, "Không đọc được ảnh")
+    return {"roll": roll_json(roll)}
 
 
 @app.get("/api/roll/{date}")
@@ -408,6 +437,7 @@ def edit_faces(date: str, body: FacesBody, u=Depends(teacher_only)):
                     "manual": o.get("manual", False) if o else True,
                     "crop": crop})
     db.update_roll_faces(date, CLASS_CODE, out)
+    _cleanup_uploads()
     return {"roll": roll_json(db.get_roll(date, CLASS_CODE))}
 
 
@@ -426,9 +456,10 @@ def teacher_claim(date: str, body: ClaimBody, u=Depends(teacher_only)):
     if body.student_id is None:
         db.clear_claim(date, CLASS_CODE, body.fid)
     else:
-        if not db.get_student(body.student_id):
+        st = db.get_student(body.student_id)
+        if not st:
             raise HTTPException(404, "Không có sinh viên này")
-        db.set_claim(date, CLASS_CODE, body.fid, body.student_id, "teacher")
+        db.set_claim(date, CLASS_CODE, body.fid, st["id"], "teacher")
     return {"ok": True}
 
 
@@ -472,7 +503,7 @@ def student_roll(date: str | None = None, u=Depends(student_only)):
         faces.append({"fid": f["fid"], "x": f["x"], "y": f["y"], "w": f["w"], "h": f["h"],
                       "crop_url": f"/uploads/{f['crop']}",
                       "taken": c is not None,
-                      "mine": bool(c and c["student_id"] == me_id)})
+                      "mine": bool(c and c["student_id"].lower() == me_id.lower())})
     return {"roll": {"date": r["date"], "image_id": r["image_id"],
                      "image_url": f"/uploads/{r['image_id']}.jpg",
                      "image_width": r["width"], "image_height": r["height"],
@@ -490,7 +521,7 @@ class StudentClaimBody(BaseModel):
 def student_claim(body: StudentClaimBody, u=Depends(student_only)):
     _need_date(body.date)
     me_row = db.get_student(u["user_id"])
-    if body.student_id.strip() != me_row["id"]:
+    if body.student_id.strip().lower() != me_row["id"].lower():
         raise HTTPException(400, "MSSV không khớp với tài khoản của bạn")
     if norm_name(body.name) != norm_name(me_row["name"]):
         raise HTTPException(400, "Họ tên không khớp với MSSV này")
@@ -518,7 +549,8 @@ def student_unclaim(date: str, u=Depends(student_only)):
         raise HTTPException(404, "Chưa có buổi điểm danh này")
     if not roll["is_open"]:
         raise HTTPException(403, "Buổi điểm danh đã đóng")
-    db.clear_student_claim(date, CLASS_CODE, u["user_id"])
+    me_row = db.get_student(u["user_id"])
+    db.clear_student_claim(date, CLASS_CODE, me_row["id"] if me_row else u["user_id"])
     return {"ok": True}
 
 
@@ -540,6 +572,7 @@ def save_session(body: SaveBody, u=Depends(teacher_only)):
     if not items:
         raise HTTPException(400, "Chưa có sinh viên nào được xác nhận")
     sid = db.upsert_session(body.date, CLASS_CODE, items)
+    _cleanup_uploads()
     return {"ok": True, "session_id": sid, "present_count": len(items)}
 
 
@@ -593,9 +626,124 @@ def set_excused(date: str, body: ExcusedBody, u=Depends(teacher_only)):
 
 @app.delete("/api/sessions/{date}")
 def session_delete(date: str, u=Depends(teacher_only)):
-    roll = db.get_roll(date, CLASS_CODE)
     db.delete_session(date, CLASS_CODE)
-    if roll:
-        for p in UPLOADS.glob(roll["image_id"] + "*.jpg"):
-            p.unlink(missing_ok=True)
+    _cleanup_uploads()
+    return {"ok": True}
+
+
+# ---------- Xuất báo cáo chuyên cần CSV (tương thích Excel tiếng Việt UTF-8 BOM) ----------
+@app.get("/api/export/attendance.csv")
+def export_attendance_csv(u=Depends(teacher_only)):
+    mat = db.attendance_matrix(CLASS_CODE)
+    buf = io.StringIO()
+    buf.write("\ufeff")  # UTF-8 BOM để mở trực tiếp trên Microsoft Excel không lỗi font tiếng Việt
+    writer = csv.writer(buf)
+
+    vn_dates = [f"{d[8:10]}/{d[5:7]}/{d[0:4]}" for d in mat["dates"]]
+    writer.writerow([
+        "STT", "MSSV", "Họ và tên",
+        *vn_dates,
+        "Có mặt", "Vắng có phép", "Vắng không phép", "Tổng số buổi", "Tỉ lệ (%)", "Đánh giá",
+    ])
+    for idx, r in enumerate(mat["rows"], start=1):
+        writer.writerow([
+            idx, r["id"], r["name"],
+            *r["cells"],
+            r["present"], r["excused"], r["unexcused"], r["total"], r["pct"], r["note"],
+        ])
+
+    filename = f"chuyencan_{CLASS_CODE}_{_date.today().isoformat()}.csv"
+    return StreamingResponse(
+        iter([buf.getvalue().encode("utf-8")]),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+# ---------- Trợ lý AI Hỏi đáp Điểm danh (RAG + XLNNTN) ----------
+class ChatTurn(BaseModel):
+    role: str
+    content: str
+
+
+class RagAskBody(BaseModel):
+    question: str = Field(..., min_length=1, max_length=1000)
+    history: list[ChatTurn] = []
+
+
+@app.post("/api/rag/ask")
+async def rag_ask(body: RagAskBody, u=Depends(current_user)):
+    q = body.question.strip()
+    if not q:
+        raise HTTPException(400, "Câu hỏi không được để trống")
+    hist = [{"role": t.role, "content": t.content} for t in body.history[-6:]]
+    result = await run_in_threadpool(
+        rag.answer_question, q, CLASS_CODE, CLASS_NAME, u, hist
+    )
+    return result
+
+
+@app.get("/api/rag/stats")
+def rag_stats(u=Depends(current_user)):
+    return rag.corpus_stats(CLASS_CODE, CLASS_NAME, u)
+
+
+@app.get("/api/rag/docs")
+def rag_list_docs(u=Depends(current_user)):
+    return {
+        "builtin": [{"id": d["id"], "title": d["title"], "content": d["content"]} for d in rag.BUILTIN_KB_DOCS],
+        "custom": db.list_knowledge_docs(CLASS_CODE),
+    }
+
+
+class KnowledgeDocBody(BaseModel):
+    title: str = Field(..., min_length=2, max_length=200)
+    content: str = Field(..., min_length=5, max_length=10000)
+
+
+@app.post("/api/rag/docs")
+def rag_add_doc(body: KnowledgeDocBody, u=Depends(teacher_only)):
+    doc_id = db.add_knowledge_doc(CLASS_CODE, body.title, body.content)
+    return {"ok": True, "id": doc_id}
+
+
+@app.delete("/api/rag/docs/{doc_id}")
+def rag_del_doc(doc_id: int, u=Depends(teacher_only)):
+    if not db.delete_knowledge_doc(doc_id, CLASS_CODE):
+        raise HTTPException(404, "Không tìm thấy tài liệu")
+    return {"ok": True}
+
+
+class RagConfigBody(BaseModel):
+    provider: str  # local | gemini | openai | ollama
+    model: str = ""
+    base_url: str = ""
+    api_key: str | None = None  # None = giữ nguyên key cũ, "" = xoá key
+
+
+@app.get("/api/rag/config")
+def rag_get_config(u=Depends(teacher_only)):
+    cfg = rag.get_rag_config()
+    return {
+        "provider": cfg["provider"],
+        "model": cfg["model"],
+        "base_url": cfg["base_url"],
+        "has_saved_key": bool(cfg["api_key"]),
+        "has_env_key": bool(os.environ.get("GEMINI_API_KEY") or os.environ.get("OPENAI_API_KEY")),
+    }
+
+
+@app.put("/api/rag/config")
+def rag_put_config(body: RagConfigBody, u=Depends(teacher_only)):
+    prov = body.provider.strip().lower()
+    if prov not in {"local", "gemini", "openai", "ollama"}:
+        raise HTTPException(400, "Provider chỉ nhận: local, gemini, openai, ollama")
+    updates = {
+        "rag_provider": prov,
+        "rag_model": body.model.strip(),
+        "rag_base_url": body.base_url.strip(),
+    }
+    if body.api_key is not None:
+        updates["rag_api_key"] = body.api_key.strip()
+    db.set_settings(updates)
     return {"ok": True}

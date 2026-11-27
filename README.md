@@ -33,13 +33,15 @@
 - Theo dõi **thời gian thực** ai đã chọn mặt nào (sinh viên tự chọn hoặc giáo viên gán).
 - Lưu buổi điểm danh, đánh dấu **vắng có phép**, xoá buổi.
 - **Xem ảnh mặt của từng sinh viên theo từng ngày** để phát hiện điểm danh hộ.
-- Dashboard: tổng quan lớp, tỉ lệ chuyên cần theo sinh viên và theo buổi.
+- Dashboard: tổng quan lớp, tỉ lệ chuyên cần theo sinh viên và theo buổi, **xuất báo cáo chuyên cần ra file Excel (CSV chuẩn UTF-8 BOM)**.
 - Quản lý lớp: thêm, sửa, xoá sinh viên, import danh sách từ CSV, đặt lại mật khẩu sinh viên.
+- **Trợ lý AI Hỏi đáp Ngôn ngữ Tự nhiên (Hybrid RAG + XLNNTN):** tra cứu điểm danh bằng câu hỏi tiếng Việt tự nhiên (có dấu hoặc không dấu), xem chi tiết nguồn truy xuất BM25 + TF-IDF, nạp thêm tài liệu quy chế môn học vào kho tri thức và tuỳ chọn kết nối LLM (Gemini, OpenAI, Ollama).
 
 **Sinh viên**
-- Đăng nhập bằng MSSV, đổi mật khẩu.
+- Đăng nhập bằng MSSV (không phân biệt chữ hoa/thường), đổi mật khẩu.
 - Chỉ thấy ảnh điểm danh và danh sách mặt cắt ra, chọn buổi cần điểm danh.
 - Bấm vào khuôn mặt của mình, nhập MSSV và họ tên để xác nhận. Chọn nhầm thì đổi hoặc bỏ chọn được.
+- **Chat với Trợ lý AI Điểm danh:** tự tra cứu số buổi có mặt/vắng, tỉ lệ chuyên cần cá nhân và hỏi quy chế lớp học (đảm bảo quyền riêng tư — không xem được dữ liệu của sinh viên khác).
 
 ---
 
@@ -50,45 +52,47 @@
 | Ngôn ngữ | Python 3.10+ | Toàn bộ backend |
 | Web framework | FastAPI | Xây dựng REST API, kiểm tra dữ liệu vào bằng Pydantic |
 | Web server | Uvicorn | Chạy ứng dụng FastAPI |
-| AI phát hiện khuôn mặt | OpenCV `FaceDetectorYN` + mô hình **YuNet** (ONNX) | Tìm khuôn mặt trong ảnh lớp |
-| Xử lý ảnh | OpenCV, NumPy | Đọc ảnh, cắt ảnh mặt |
-| Cơ sở dữ liệu | SQLite | Lưu sinh viên, buổi học, điểm danh, tài khoản |
-| Giao diện | HTML, CSS, JavaScript thuần, SVG | Vẽ và chỉnh khung mặt, zoom, kéo ảnh |
-| Bảo mật | PBKDF2-SHA256, cookie phiên | Mã hoá mật khẩu, đăng nhập, phân quyền |
+| AI phát hiện khuôn mặt | OpenCV `FaceDetectorYN` + mô hình **YuNet** (ONNX) | Tìm khuôn mặt trong ảnh lớp (thread-safe) |
+| Xử lý ngôn ngữ tự nhiên & RAG | Hybrid **Okapi BM25 + Sublinear TF-IDF Cosine** (NumPy) + NER Tiếng Việt + LLM tuỳ chọn | Tách từ kênh đôi có/không dấu, trích xuất thực thể, truy xuất tri thức và sinh câu trả lời |
+| Xử lý ảnh | OpenCV, NumPy | Đọc ảnh, cắt ảnh mặt, tự động dọn ảnh thừa |
+| Cơ sở dữ liệu | SQLite | Lưu sinh viên, buổi học, điểm danh, tài khoản, kho tri thức RAG |
+| Giao diện | HTML, CSS, JavaScript thuần, SVG | Vẽ và chỉnh khung mặt, zoom, kéo ảnh, giao diện chat RAG |
+| Bảo mật | PBKDF2-SHA256, cookie phiên | Mã hoá mật khẩu, đăng nhập, phân quyền dữ liệu RAG |
 
 ---
 
 ## Cấu trúc thư mục
 
 ```
-diemdanh/
-├── app.py                 # FastAPI: định tuyến, đăng nhập, phân quyền, toàn bộ API
-├── db.py                  # SQLite: tạo bảng, truy vấn, thống kê dashboard
-├── detector.py            # Bọc mô hình YuNet, trả về danh sách khung mặt
+MNM/
+├── app.py                 # FastAPI: định tuyến, đăng nhập, phân quyền, API điểm danh, Excel & RAG
+├── db.py                  # SQLite: tạo bảng, truy vấn, kho tri thức RAG, thống kê & xuất ma trận
+├── detector.py            # Bọc mô hình YuNet an toàn đa luồng (threading.Lock)
+├── rag.py                 # Engine Hybrid RAG & Xử lý ngôn ngữ tự nhiên tiếng Việt (XLNNTN)
 ├── requirements.txt       # Thư viện Python cần cài
-├── README.md              # Tài liệu này
+├── README.md              # Tài liệu hệ thống
 │
 ├── models/
-│   └── face_detection_yunet_2023mar.onnx    # Mô hình YuNet (tải riêng, xem phần cài đặt)
+│   └── face_detection_yunet_2023mar.onnx    # Mô hình YuNet ONNX
 │
 ├── static/                # Giao diện web
 │   ├── login.html         # Trang đăng nhập chung
-│   ├── index.html         # Giao diện giáo viên (Điểm danh, Dashboard, Data)
-│   └── student.html       # Giao diện sinh viên
+│   ├── index.html         # Giao diện giáo viên (Điểm danh, Dashboard, Data, Trợ lý RAG)
+│   └── student.html       # Giao diện sinh viên (tự chọn mặt + khung chat Trợ lý AI)
 │
 └── data/                  # Tạo tự động khi chạy lần đầu
     ├── diemdanh.db        # Cơ sở dữ liệu SQLite
-    ├── uploads/           # Ảnh lớp gốc và ảnh mặt cắt ra (.jpg)
-    └── lop_MM01.csv       # (tuỳ chọn) danh sách lớp mẫu để import
+    └── uploads/           # Ảnh lớp gốc và ảnh mặt cắt ra (.jpg)
 ```
 
 **Vai trò từng file Python**
 
 | File | Làm gì | Hàm/nhóm hàm chính |
 |---|---|---|
-| `app.py` | Nhận yêu cầu từ trình duyệt, kiểm tra quyền, gọi `db.py` và `detector.py`, trả JSON | `login`, `detect`, `edit_faces`, `teacher_claim`, `student_claim`, `save_session`, `dashboard`, `set_excused` |
-| `db.py` | Toàn bộ lệnh SQL. `app.py` không viết SQL trực tiếp | `init_db`, `create_roll`, `student_claim`, `upsert_session`, `dashboard_stats`, `student_history` |
-| `detector.py` | Đóng gói AI. Muốn đổi mô hình chỉ cần giữ nguyên định dạng trả về `{x, y, w, h, score, landmarks}` | `FaceDetector.detect`, `get_detector` |
+| `app.py` | Nhận yêu cầu từ trình duyệt, kiểm tra quyền, gọi `db.py`, `detector.py` và `rag.py` | `login`, `detect`, `edit_faces`, `student_claim`, `save_session`, `export_attendance_csv`, `rag_ask` |
+| `db.py` | Toàn bộ lệnh SQL, quản lý phiên, kho tri thức RAG và ma trận chuyên cần | `init_db`, `create_roll`, `student_claim`, `upsert_session`, `dashboard_stats`, `attendance_matrix` |
+| `detector.py` | Đóng gói AI phát hiện khuôn mặt. Giữ định dạng trả về `{x, y, w, h, score, landmarks}` | `FaceDetector.detect`, `get_detector` |
+| `rag.py` | Pipeline XLNNTN tiếng Việt + Hybrid RAG (BM25 + TF-IDF + NER + NLG/LLM) | `tokenize_vi`, `analyze_query`, `build_corpus`, `HybridRetriever`, `answer_question` |
 
 ---
 
@@ -230,6 +234,18 @@ Tất cả trả về JSON (trừ trang HTML và ảnh).
 | GET | `/api/sessions/{ngày}` | Chi tiết buổi: có mặt (kèm ảnh mặt), vắng, vắng có phép |
 | PUT | `/api/sessions/{ngày}/excused` | Đánh dấu hoặc bỏ vắng có phép |
 | DELETE | `/api/sessions/{ngày}` | Xoá buổi (kèm ảnh và lựa chọn của ngày đó) |
+| GET | `/api/export/attendance.csv` | Xuất bảng tổng hợp chuyên cần ra file CSV chuẩn Excel (UTF-8 BOM) |
+
+**Trợ lý AI Hỏi đáp Điểm danh (RAG & XLNNTN)**
+
+| Phương thức | Đường dẫn | Quyền | Mô tả |
+|---|---|---|---|
+| POST | `/api/rag/ask` | Đã đăng nhập | Đặt câu hỏi ngôn ngữ tự nhiên (hỗ trợ lịch sử hội thoại, trả về câu trả lời + nhãn NLP + nguồn Top-K) |
+| GET | `/api/rag/stats` | Đã đăng nhập | Thống kê số đoạn tri thức (chunks), kích thước từ vựng và cấu hình bộ sinh |
+| GET | `/api/rag/docs` | Đã đăng nhập | Danh sách tài liệu quy chế mặc định và tài liệu bổ sung của lớp |
+| POST | `/api/rag/docs` | Giáo viên | Nạp thêm tài liệu mới vào kho tri thức RAG |
+| DELETE | `/api/rag/docs/{id}` | Giáo viên | Xoá tài liệu tuỳ chỉnh khỏi kho tri thức |
+| GET / PUT | `/api/rag/config` | Giáo viên | Xem / cập nhật chế độ sinh câu trả lời (`local`, `gemini`, `openai`, `ollama`) |
 
 **Sinh viên**
 
@@ -335,20 +351,40 @@ Vắng có phép được tính nửa điểm, vắng không phép là 0. Hệ s
 
 ---
 
+## Kiến trúc Trợ lý AI Hỏi đáp Điểm danh (Hybrid RAG + XLNNTN)
+
+Module `rag.py` cài đặt quy trình **Retrieval-Augmented Generation (RAG)** kết hợp **Xử lý ngôn ngữ tự nhiên tiếng Việt (XLNNTN)** gồm 4 bước:
+
+```
+Câu hỏi Tiếng Việt ──▶ [1. Tiền xử lý XLNNTN & NER] ──▶ [2. Lập chỉ mục động SQLite + Kho tri thức]
+   (có/không dấu)         • Chuẩn hoá NFC, từ viết tắt        • Hồ sơ từng SV, chi tiết từng buổi
+                          • Token kênh đôi + Word Bigrams     • Phiên đang mở (Roll) + Tài liệu lớp
+                          • Nhận diện MSSV, Họ tên, Ngày      • Phân quyền dữ liệu GV / SV
+                                      │                                      │
+                                      ▼                                      ▼
+                     [4. Sinh câu trả lời (Dual-Mode)] ◀── [3. Truy xuất lai (Hybrid Retriever)]
+                        • Local XLNNTN (Offline, 0 API key)   • 0.45 × Okapi BM25 + 0.35 × TF-IDF Cosine
+                        • Hoặc Gemini / OpenAI / Ollama       • + Entity & Intent Reranking → Top-K Chunks
+```
+
+1. **Tiền xử lý XLNNTN tiếng Việt:** Chuẩn hoá bảng mã Unicode NFC, giải nghĩa từ viết tắt phổ biến (`sv` → `sinh viên`, `ko` → `không`, `dd` → `điểm danh`, `cc` → `chuyên cần`), lọc hư từ tiếng Việt, tách đặc trưng kênh đôi (kênh giữ nguyên dấu + kênh lược bỏ dấu) kết hợp *word bigrams* và *character 3-grams* giúp truy vấn chính xác ngay cả khi người dùng gõ không dấu hoặc sai chính tả nhẹ.
+2. **Nhận diện thực thể (NER) & Giải quyết đồng tham chiếu:** Tự động bắt MSSV, họ tên đầy đủ hoặc tên gọi sinh viên, phân giải thời gian tương đối (*"hôm nay"*, *"hôm qua"*, *"buổi mới nhất"*, *"ngày 4/11"*) và kế thừa ngữ cảnh từ câu hỏi trước trong hội thoại nhiều lượt (*"Thế còn bạn SV02?"*).
+3. **Truy xuất lai (Hybrid Retrieval) có kiểm soát quyền riêng tư:** Kết hợp điểm từ vựng **Okapi BM25** ($k_1=1.5, b=0.75$) với độ tương đồng **Cosine trên ma trận Sublinear TF-IDF** và điểm thưởng khớp thực thể. Khi người hỏi là Sinh viên, kho chỉ mục chỉ nạp hồ sơ của chính sinh viên đó và quy chế công khai.
+4. **Sinh câu trả lời kép (Dual-Mode Generation):** Mặc định chạy bộ tổng hợp ngôn ngữ tự nhiên nội bộ (**Local XLNNTN**) đảm bảo số liệu khớp 100% với SQLite mà không cần kết nối Internet hay API key; đồng thời hỗ trợ chuyển sang **Google Gemini**, **OpenAI-compatible** hoặc **Ollama** ngay trên giao diện.
+
+---
+
 ## Hạn chế và hướng phát triển
 
 **Hạn chế hiện tại**
-- Hệ thống **phát hiện** khuôn mặt (face detection), chưa **nhận dạng** xem đó là ai (face recognition). Việc gán danh tính do sinh viên tự chọn, giáo viên kiểm tra lại bằng ảnh mặt theo ngày.
-- Mới hỗ trợ **một lớp** (mã lớp `MNM-01` đặt cố định trong `app.py`).
-- Đồng bộ bằng cách hỏi lại server mỗi 4 giây, chưa dùng WebSocket.
-- SQLite phù hợp lớp học và vài trăm người dùng cùng lúc, chưa dành cho quy mô toàn trường.
+- Phần nhận diện ảnh mới **phát hiện** khuôn mặt (face detection), chưa tự động **nhận dạng** danh tính (face recognition). Việc gán danh tính do sinh viên tự chọn, giáo viên kiểm tra lại bằng chuỗi ảnh mặt theo ngày.
+- Mới hỗ trợ **một lớp** mặc định (`MNM-01` đặt trong `app.py`, dù CSDL đã thiết kế sẵn cột `class_code`).
+- Đồng bộ trạng thái chọn mặt bằng cơ chế polling mỗi 4 giây, chưa dùng WebSocket.
 
 **Hướng phát triển**
-- Thêm nhận dạng khuôn mặt tự động (ví dụ mô hình SFace trong OpenCV) để gợi ý sẵn MSSV cho từng khung.
-- Hỗ trợ nhiều lớp: bảng lớp, liên kết sinh viên và giáo viên với lớp, phân quyền theo lớp.
-- Xuất báo cáo chuyên cần ra Excel hoặc PDF, gửi cảnh báo sinh viên vắng nhiều.
-- Chuyển sang PostgreSQL và WebSocket khi mở rộng quy mô.
-- Trợ lý hỏi đáp bằng ngôn ngữ tự nhiên trên dữ liệu điểm danh (ví dụ "Bạn A ngày 4/11 có đi học không?").
+- Thêm nhận dạng khuôn mặt tự động (mô hình **SFace** trong OpenCV Zoo) để gợi ý sẵn MSSV cho từng khung mặt.
+- Mở rộng giao diện quản lý nhiều lớp học song song và phân quyền giảng viên theo lớp.
+- Tích hợp Dense Embedding tiếng Việt (ví dụ `Vietnamese-SBERT` / `bge-m3`) song song với BM25 khi triển khai trên máy chủ quy mô lớn.
 
 ---
 

@@ -1,8 +1,12 @@
-@"
 .venv/
+venv/
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
 data/
 .idea/
+.vscode/
 .env
-"@ | Out-File -Encoding utf8 .gitignore
+*.log
+.DS_Store
+Thumbs.db

@@ -1,3 +1,4 @@
+import contextlib
 import hashlib
 import hmac
 import json
@@ -10,11 +11,19 @@ DB_PATH = Path(__file__).parent / "data" / "diemdanh.db"
 DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 
 
+@contextlib.contextmanager
 def get_conn():
     conn = sqlite3.connect(DB_PATH, timeout=10)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
-    return conn
+    try:
+        yield conn
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
 
 
 def _cols(c, table):
@@ -26,7 +35,9 @@ def init_db():
         c.executescript("""
         CREATE TABLE IF NOT EXISTS students(
             id TEXT PRIMARY KEY,
-            name TEXT NOT NULL
+            name TEXT NOT NULL,
+            pw_hash TEXT,
+            pw_salt TEXT
         );
         CREATE TABLE IF NOT EXISTS sessions(
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -38,6 +49,8 @@ def init_db():
         CREATE TABLE IF NOT EXISTS attendance(
             session_id INTEGER NOT NULL,
             student_id TEXT NOT NULL,
+            crop TEXT,
+            claimed_by TEXT,
             PRIMARY KEY(session_id, student_id),
             FOREIGN KEY(session_id) REFERENCES sessions(id) ON DELETE CASCADE,
             FOREIGN KEY(student_id) REFERENCES students(id) ON DELETE CASCADE
@@ -85,8 +98,21 @@ def init_db():
             UNIQUE(date, class_code, student_id),
             FOREIGN KEY(student_id) REFERENCES students(id) ON DELETE CASCADE
         );
+        -- Tài liệu kho tri thức bổ sung cho RAG Chatbot (quy chế môn học, thông báo lớp...)
+        CREATE TABLE IF NOT EXISTS knowledge_docs(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            class_code TEXT NOT NULL,
+            title TEXT NOT NULL,
+            content TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        );
+        -- Cấu hình hệ thống (provider/model cho RAG Generator...)
+        CREATE TABLE IF NOT EXISTS app_settings(
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        );
         """)
-        # migrate DB cũ
+        # migrate DB cũ nếu đã tạo từ phiên bản trước
         if "pw_hash" not in _cols(c, "students"):
             c.execute("ALTER TABLE students ADD COLUMN pw_hash TEXT")
             c.execute("ALTER TABLE students ADD COLUMN pw_salt TEXT")
@@ -132,19 +158,33 @@ def set_teacher_password(username, pw):
 
 
 def get_student(sid):
+    """Tra cứu sinh viên không phân biệt hoa/thường của MSSV, trả về id chuẩn."""
+    if not sid:
+        return None
     with get_conn() as c:
-        r = c.execute("SELECT id, name FROM students WHERE id=?", (sid,)).fetchone()
+        r = c.execute(
+            "SELECT id, name FROM students WHERE LOWER(id)=LOWER(?)",
+            (sid.strip(),),
+        ).fetchone()
     return dict(r) if r else None
 
 
 def verify_student(sid, password):
-    """Chưa đặt mật khẩu riêng (pw_hash NULL) thì mật khẩu mặc định = MSSV."""
+    """
+    Chưa đặt mật khẩu riêng (pw_hash NULL) thì mật khẩu mặc định = MSSV
+    (hỗ trợ không phân biệt hoa/thường khi đăng nhập lần đầu trên điện thoại).
+    """
+    if not sid:
+        return False
     with get_conn() as c:
-        r = c.execute("SELECT pw_hash, pw_salt FROM students WHERE id=?", (sid,)).fetchone()
+        r = c.execute(
+            "SELECT id, pw_hash, pw_salt FROM students WHERE LOWER(id)=LOWER(?)",
+            (sid.strip(),),
+        ).fetchone()
     if not r:
         return False
     if r["pw_hash"] is None:
-        return hmac.compare_digest(password.encode(), sid.encode())
+        return hmac.compare_digest(password.strip().lower().encode(), r["id"].lower().encode())
     return hmac.compare_digest(_hash(password, r["pw_salt"]), r["pw_hash"])
 
 
@@ -152,8 +192,10 @@ def set_student_password(sid, pw):
     """pw=None: về lại mật khẩu mặc định (= MSSV)."""
     h, s = (None, None) if pw is None else _new_hash(pw)
     with get_conn() as c:
-        return c.execute("UPDATE students SET pw_hash=?, pw_salt=? WHERE id=?",
-                         (h, s, sid)).rowcount
+        return c.execute(
+            "UPDATE students SET pw_hash=?, pw_salt=? WHERE LOWER(id)=LOWER(?)",
+            (h, s, sid.strip()),
+        ).rowcount
 
 
 def create_token(role, user_id, days=7):
@@ -197,31 +239,56 @@ def seed_students_if_empty(default_students):
 
 
 def add_student(sid, name):
-    """Ném sqlite3.IntegrityError nếu MSSV đã tồn tại."""
+    """Ném sqlite3.IntegrityError nếu MSSV đã tồn tại (kể cả khác hoa/thường)."""
+    if get_student(sid):
+        raise sqlite3.IntegrityError("Duplicate student id")
     with get_conn() as c:
         c.execute("INSERT INTO students(id, name) VALUES(?,?)", (sid, name))
 
 
 def update_student(sid, name):
     with get_conn() as c:
-        cur = c.execute("UPDATE students SET name=? WHERE id=?", (name, sid))
+        cur = c.execute("UPDATE students SET name=? WHERE LOWER(id)=LOWER(?)", (name, sid))
         return cur.rowcount
 
 
 def delete_student(sid):
     """Xoá luôn lịch sử điểm danh + lựa chọn khuôn mặt của SV này (ON DELETE CASCADE)."""
     with get_conn() as c:
-        cur = c.execute("DELETE FROM students WHERE id=?", (sid,))
+        cur = c.execute("DELETE FROM students WHERE LOWER(id)=LOWER(?)", (sid,))
         return cur.rowcount
 
 
 def merge_students(students):
     """Thêm SV mới, cập nhật tên nếu MSSV đã có. Không xoá ai, không đụng mật khẩu."""
     with get_conn() as c:
-        c.executemany(
-            "INSERT INTO students(id, name) VALUES(?,?) "
-            "ON CONFLICT(id) DO UPDATE SET name=excluded.name",
-            [(s["id"], s["name"]) for s in students])
+        for s in students:
+            existing = c.execute(
+                "SELECT id FROM students WHERE LOWER(id)=LOWER(?)", (s["id"],)
+            ).fetchone()
+            if existing:
+                c.execute("UPDATE students SET name=? WHERE id=?", (s["name"], existing["id"]))
+            else:
+                c.execute("INSERT INTO students(id, name) VALUES(?,?)", (s["id"], s["name"]))
+
+
+# ---------- Quản lý file ảnh đang được tham chiếu ----------
+def referenced_upload_files() -> set[str]:
+    """Tập tất cả tên file .jpg trong uploads còn đang dùng bởi rolls hoặc attendance."""
+    used: set[str] = set()
+    with get_conn() as c:
+        for r in c.execute("SELECT image_id, faces_json FROM rolls").fetchall():
+            used.add(f"{r['image_id']}.jpg")
+            try:
+                for f in json.loads(r["faces_json"]):
+                    if f.get("crop"):
+                        used.add(f["crop"])
+            except Exception:
+                pass
+        for r in c.execute("SELECT crop FROM attendance WHERE crop IS NOT NULL").fetchall():
+            if r["crop"]:
+                used.add(r["crop"])
+    return used
 
 
 # ---------- Roll: ảnh + khung + lựa chọn ----------
@@ -380,20 +447,22 @@ def get_session_detail(date, class_code):
 
 def set_excused(date, class_code, student_id, flag):
     """Trả 'ok' | 'nosession' | 'present'."""
+    stu = get_student(student_id)
+    canonical_id = stu["id"] if stu else student_id
     with get_conn() as c:
         s = c.execute("SELECT id FROM sessions WHERE date=? AND class_code=?",
                       (date, class_code)).fetchone()
         if not s:
             return "nosession"
         if c.execute("SELECT 1 FROM attendance WHERE session_id=? AND student_id=?",
-                     (s["id"], student_id)).fetchone():
+                     (s["id"], canonical_id)).fetchone():
             return "present"
         if flag:
             c.execute("INSERT OR IGNORE INTO excused(session_id, student_id) VALUES(?,?)",
-                      (s["id"], student_id))
+                      (s["id"], canonical_id))
         else:
             c.execute("DELETE FROM excused WHERE session_id=? AND student_id=?",
-                      (s["id"], student_id))
+                      (s["id"], canonical_id))
     return "ok"
 
 
@@ -405,6 +474,8 @@ def delete_session(date, class_code):
 
 
 def student_history(student_id, class_code):
+    stu = get_student(student_id)
+    canonical_id = stu["id"] if stu else student_id
     with get_conn() as c:
         rows = c.execute(
             "SELECT s.date, a.crop, a.claimed_by, "
@@ -413,7 +484,7 @@ def student_history(student_id, class_code):
             "LEFT JOIN attendance a ON a.session_id=s.id AND a.student_id=? "
             "LEFT JOIN excused e ON e.session_id=s.id AND e.student_id=? "
             "WHERE s.class_code=? ORDER BY s.date DESC",
-            (student_id, student_id, class_code)).fetchall()
+            (canonical_id, canonical_id, class_code)).fetchall()
     out = []
     for r in rows:
         status = "present" if r["present"] else "excused" if r["excused"] else "absent"
@@ -488,3 +559,98 @@ def dashboard_stats(class_code):
         "sessions_summary": sessions_summary,
         "per_student": per_student,
     }
+
+
+def attendance_matrix(class_code):
+    """Ma trận điểm danh phục vụ xuất báo cáo CSV / Excel."""
+    EXCUSED_WEIGHT = 0.5
+    with get_conn() as c:
+        sessions = [dict(r) for r in c.execute(
+            "SELECT id, date FROM sessions WHERE class_code=? ORDER BY date",
+            (class_code,)).fetchall()]
+        students = [dict(r) for r in c.execute(
+            "SELECT id, name FROM students ORDER BY id").fetchall()]
+        present_pairs = {(r[0], r[1]) for r in c.execute(
+            "SELECT a.session_id, a.student_id FROM attendance a "
+            "JOIN sessions s ON s.id=a.session_id WHERE s.class_code=?",
+            (class_code,)).fetchall()}
+        excused_pairs = {(r[0], r[1]) for r in c.execute(
+            "SELECT e.session_id, e.student_id FROM excused e "
+            "JOIN sessions s ON s.id=e.session_id WHERE s.class_code=?",
+            (class_code,)).fetchall()}
+
+    n_sess = len(sessions)
+    rows = []
+    for st in students:
+        sid = st["id"]
+        cells = []
+        cnt_p, cnt_e, cnt_a = 0, 0, 0
+        for s in sessions:
+            pair = (s["id"], sid)
+            if pair in present_pairs:
+                cells.append("Có mặt")
+                cnt_p += 1
+            elif pair in excused_pairs:
+                cells.append("Có phép")
+                cnt_e += 1
+            else:
+                cells.append("Vắng")
+                cnt_a += 1
+        pct = round((cnt_p + EXCUSED_WEIGHT * cnt_e) / n_sess * 100) if n_sess else 0
+        rows.append({
+            "id": sid,
+            "name": st["name"],
+            "cells": cells,
+            "present": cnt_p,
+            "excused": cnt_e,
+            "unexcused": cnt_a,
+            "total": n_sess,
+            "pct": pct,
+            "note": "Tốt" if pct >= 80 else "Cần chú ý",
+        })
+    return {"dates": [s["date"] for s in sessions], "rows": rows}
+
+
+# ---------- Kho tri thức RAG & Cài đặt ----------
+def list_knowledge_docs(class_code: str) -> list[dict]:
+    with get_conn() as c:
+        rows = c.execute(
+            "SELECT id, class_code, title, content, created_at "
+            "FROM knowledge_docs WHERE class_code=? ORDER BY id DESC",
+            (class_code,),
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def add_knowledge_doc(class_code: str, title: str, content: str) -> int:
+    now = datetime.now().isoformat(timespec="seconds")
+    with get_conn() as c:
+        cur = c.execute(
+            "INSERT INTO knowledge_docs(class_code, title, content, created_at) VALUES(?,?,?,?)",
+            (class_code, title.strip(), content.strip(), now),
+        )
+        return int(cur.lastrowid)
+
+
+def delete_knowledge_doc(doc_id: int, class_code: str) -> int:
+    with get_conn() as c:
+        return c.execute(
+            "DELETE FROM knowledge_docs WHERE id=? AND class_code=?",
+            (doc_id, class_code),
+        ).rowcount
+
+
+def get_settings() -> dict[str, str]:
+    with get_conn() as c:
+        rows = c.execute("SELECT key, value FROM app_settings").fetchall()
+    return {r["key"]: r["value"] for r in rows}
+
+
+def set_settings(mapping: dict[str, str]):
+    with get_conn() as c:
+        for k, v in mapping.items():
+            c.execute(
+                "INSERT INTO app_settings(key, value) VALUES(?,?) "
+                "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+                (k, v),
+            )
